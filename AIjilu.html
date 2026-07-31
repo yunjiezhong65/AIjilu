@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>👩‍❤️‍👨 双人 AI 记账管家</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f7fa; color: #333; padding: 20px; display: flex; justify-content: center; }
+        .app-container { width: 100%; max-width: 500px; background: #fff; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 20px; min-height: 90vh; display: flex; flex-direction: column; }
+        
+        /* 标头与设置 */
+        .header { text-align: center; margin-bottom: 15px; }
+        .header h1 { font-size: 20px; color: #2c3e50; }
+        .config-box { background: #f8f9fa; padding: 12px; border-radius: 10px; margin-bottom: 15px; font-size: 13px; }
+        .config-box input { width: 100%; padding: 8px; margin-top: 5px; border: 1px solid #ddd; border-radius: 6px; font-size: 12px; }
+        
+        /* 人设选择 */
+        .persona-selector { display: flex; gap: 10px; margin-bottom: 15px; }
+        .persona-btn { flex: 1; padding: 10px; border: 2px solid #eee; border-radius: 10px; background: white; cursor: pointer; text-align: center; font-weight: bold; font-size: 14px; transition: 0.2s; }
+        .persona-btn.active { border-color: #ff6b6b; background: #fff0f0; color: #ff6b6b; }
+
+        /* 账单列表 */
+        .feed { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-bottom: 15px; }
+        .card { background: #fafafa; border: 1px solid #eee; border-radius: 12px; padding: 12px 15px; }
+        .card-top { display: flex; justify-content: space-between; font-size: 14px; font-weight: bold; margin-bottom: 6px; }
+        .card-amount { color: #e74c3c; font-size: 16px; }
+        .card-desc { font-size: 13px; color: #666; margin-bottom: 8px; }
+        .ai-box { background: #fff; border-left: 4px solid #ff6b6b; padding: 8px 12px; border-radius: 4px; font-size: 13px; line-height: 1.4; color: #444; }
+        .ai-badge { display: inline-block; background: #ffe3e3; color: #d63031; font-size: 11px; padding: 2px 6px; border-radius: 4px; margin-top: 6px; font-weight: bold; }
+
+        /* 底部输入框 */
+        .input-area { display: flex; gap: 8px; margin-top: auto; padding-top: 10px; border-top: 1px solid #eee; }
+        .input-area input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 8px; outline: none; }
+        .input-area button { padding: 12px 20px; background: #ff6b6b; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .input-area button:disabled { background: #ccc; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="header">
+        <h1>👩‍❤️‍👨 双人 AI 记账管家</h1>
+    </div>
+
+    <!-- API Key 配置项（保存在本地） -->
+    <div class="config-box">
+        <label>⚙️ API 设置 (Key 保存在本地浏览器)</label>
+        <input type="password" id="apiKey" placeholder="输入你的 API Key (如 DeepSeek / OpenAI)" onchange="saveConfig()">
+        <input type="text" id="apiHost" placeholder="API 接口地址 (默认 DeepSeek: https://api.deepseek.com/v1)" value="https://api.deepseek.com/v1" onchange="saveConfig()">
+    </div>
+
+    <!-- 人设切换 -->
+    <div class="persona-selector">
+        <button class="persona-btn active" id="btnCat" onclick="setPersona('cat')">🐱 毒舌猫管家</button>
+        <button class="persona-btn" id="btnAngel" onclick="setPersona('angel')">👼 夸夸天使</button>
+    </div>
+
+    <!-- 账单动态列表 -->
+    <div class="feed" id="feedList">
+        <!-- 账单卡片会自动渲染在这里 -->
+    </div>
+
+    <!-- 记账输入框 -->
+    <div class="input-area">
+        <input type="text" id="userInput" placeholder="输入花费，例：今天买奶茶 28" onkeypress="if(event.key==='Enter') addExpense()">
+        <button id="sendBtn" onclick="addExpense()">记账</button>
+    </div>
+</div>
+
+<script>
+    let currentPersona = 'cat';
+    let expenses = JSON.parse(localStorage.getItem('expenses_history') || '[]');
+
+    // 初始化页面
+    window.onload = function() {
+        document.getElementById('apiKey').value = localStorage.getItem('api_key') || '';
+        document.getElementById('apiHost').value = localStorage.getItem('api_host') || 'https://api.deepseek.com/v1';
+        renderFeed();
+    };
+
+    function saveConfig() {
+        localStorage.setItem('api_key', document.getElementById('apiKey').value.trim());
+        localStorage.setItem('api_host', document.getElementById('apiHost').value.trim());
+    }
+
+    function setPersona(type) {
+        currentPersona = type;
+        document.getElementById('btnCat').classList.toggle('active', type === 'cat');
+        document.getElementById('btnAngel').classList.toggle('active', type === 'angel');
+    }
+
+    // 渲染账单列表
+    function renderFeed() {
+        const listEl = document.getElementById('feedList');
+        listEl.innerHTML = '';
+        expenses.slice().reverse().forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+                <div class="card-top">
+                    <span>${item.description}</span>
+                    <span class="card-amount">￥${item.amount}</span>
+                </div>
+                <div class="card-desc">分类：${item.category} | 时间：${item.time}</div>
+                <div class="ai-box">
+                    <strong>${item.personaName}：</strong>${item.aiComment}
+                    <div><span class="ai-badge">${item.badge}</span></div>
+                </div>
+            `;
+            listEl.appendChild(card);
+        });
+    }
+
+    // 调用 AI API 记账
+    async function addExpense() {
+        const inputEl = document.getElementById('userInput');
+        const text = inputEl.value.trim();
+        const apiKey = document.getElementById('apiKey').value.trim();
+        const apiHost = document.getElementById('apiHost').value.trim();
+
+        if (!text) return alert('请输入消费内容！');
+        if (!apiKey) return alert('请先在上方填入你的 API Key！');
+
+        const sendBtn = document.getElementById('sendBtn');
+        sendBtn.disabled = true;
+        sendBtn.innerText = '分析中...';
+
+        // 设定 Prompt
+        const systemPrompt = currentPersona === 'cat' 
+            ? `你是一只傲娇毒舌的黑猫财务管家。分析用户的消费文本，精准给出金额、分类、100字以内的毒舌点评，以及一个搞笑勋章。必须严格返回 JSON 格式：{"amount": 数字, "category": "分类", "description": "简短描述", "aiComment": "毒舌点评", "badge": "搞笑勋章"}`
+            : `你是一位温柔治愈的夸夸天使管家。分析用户的消费文本，说明这笔消费有多棒，给出100字以内的极度赞美点评，以及一个浪漫勋章。必须严格返回 JSON 格式：{"amount": 数字, "category": "分类", "description": "简短描述", "aiComment": "夸夸点评", "badge": "浪漫勋章"}`;
+
+        try {
+            const response = await fetch(`${apiHost}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+model: 'Qwen/Qwen2.5-7B-Instruct',
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: text }
+                    ],
+                    response_format: { type: "json_object" }
+                })
+            });
+
+            const data = await response.json();
+            let resultText = data.choices[0].message.content;
+            
+            // 清理可能包含的 markdown 标签
+            resultText = resultText.replace(/```json/g, '').replace(/```/g, '').trim();
+            const res = JSON.parse(resultText);
+
+            // 保存记录
+            const newRecord = {
+                amount: res.amount || 0,
+                category: res.category || '日常消费',
+                description: res.description || text,
+                aiComment: res.aiComment || '本喵懒得点评...',
+                badge: res.badge || '消费达人',
+                personaName: currentPersona === 'cat' ? '🐱 毒舌猫' : '👼 夸夸天使',
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+
+            expenses.push(newRecord);
+            localStorage.setItem('expenses_history', JSON.stringify(expenses));
+            
+            inputEl.value = '';
+            renderFeed();
+        } catch (err) {
+            alert('调用 API 失败，请检查 Key 和 Host 是否正确！' + err.message);
+        } finally {
+            sendBtn.disabled = false;
+            sendBtn.innerText = '记账';
+        }
+    }
+</script>
+
+</body>
+</html>
