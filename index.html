@@ -3,133 +3,249 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>👩‍❤️‍👨 双人 AI 记账管家</title>
+    <title>👩‍❤️‍👨 双人 AI 记账管家 Pro</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f7fa; color: #333; padding: 20px; display: flex; justify-content: center; }
-        .app-container { width: 100%; max-width: 500px; background: #fff; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 20px; min-height: 90vh; display: flex; flex-direction: column; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; color: #2c3e50; padding: 15px; display: flex; justify-content: center; }
+        .app-container { width: 100%; max-width: 480px; background: #fff; border-radius: 20px; box-shadow: 0 8px 30px rgba(0,0,0,0.08); padding: 20px; min-height: 92vh; display: flex; flex-direction: column; position: relative; }
         
-        /* 标头与设置 */
-        .header { text-align: center; margin-bottom: 15px; }
-        .header h1 { font-size: 20px; color: #2c3e50; }
-        .config-box { background: #f8f9fa; padding: 12px; border-radius: 10px; margin-bottom: 15px; font-size: 13px; }
-        .config-box input { width: 100%; padding: 8px; margin-top: 5px; border: 1px solid #ddd; border-radius: 6px; font-size: 12px; }
+        /* 顶部看板 */
+        .header { text-align: center; margin-bottom: 12px; }
+        .header h1 { font-size: 20px; color: #1e293b; }
+        .dashboard { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; padding: 16px; border-radius: 14px; margin-bottom: 15px; }
+        .dash-title { font-size: 12px; opacity: 0.9; }
+        .dash-total { font-size: 28px; font-weight: bold; margin: 4px 0 10px 0; }
+        .progress-bar-bg { background: rgba(255,255,255,0.25); height: 8px; border-radius: 4px; overflow: hidden; }
+        .progress-bar-fill { background: #4ade80; height: 100%; width: 0%; transition: width 0.3s; }
+        .dash-foot { display: flex; justify-content: space-between; font-size: 11px; margin-top: 6px; opacity: 0.9; }
+
+        /* 配置折叠面板 */
+        details.config-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px 12px; margin-bottom: 15px; font-size: 12px; }
+        details summary { font-weight: bold; cursor: pointer; color: #475569; }
+        .config-group { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+        .config-group label { font-size: 11px; color: #64748b; }
+        .config-group input, .config-group select { width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; }
+
+        /* 人设选择（两排网格） */
+        .persona-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px; }
+        .persona-btn { padding: 10px; border: 1.5px solid #e2e8f0; border-radius: 10px; background: white; cursor: pointer; text-align: center; font-size: 13px; font-weight: 500; transition: all 0.2s; }
+        .persona-btn.active { border-color: #6366f1; background: #eef2ff; color: #4f46e5; font-weight: bold; }
+
+        /* 快捷气泡 */
+        .quick-tags { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 10px; }
+        .tag-chip { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 20px; padding: 4px 10px; font-size: 12px; cursor: pointer; white-space: nowrap; color: #475569; }
+
+        /* 账单 Feed */
+        .feed { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-bottom: 10px; max-height: 420px; }
+        .card { background: #fff; border: 1px solid #f1f5f9; box-shadow: 0 2px 8px rgba(0,0,0,0.03); border-radius: 14px; padding: 14px; position: relative; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+        .card-title { font-weight: bold; font-size: 15px; color: #0f172a; }
+        .card-amount { font-size: 16px; font-weight: bold; color: #ef4444; }
+        .card-sub { font-size: 11px; color: #94a3b8; margin-bottom: 8px; }
+        .ai-box { background: #f8fafc; border-left: 3px solid #6366f1; padding: 8px 10px; border-radius: 6px; font-size: 12px; line-height: 1.4; color: #334155; }
+        .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+        .ai-badge { display: inline-block; background: #e0e7ff; color: #4338ca; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
+        .btn-delete { color: #94a3b8; font-size: 12px; cursor: pointer; border: none; background: none; }
+        .btn-delete:hover { color: #ef4444; }
+
+        /* 底部固定输入栏 */
+        .input-area { display: flex; gap: 8px; margin-top: auto; padding-top: 10px; border-top: 1px solid #f1f5f9; }
+        .input-area input { flex: 1; padding: 12px; border: 1.5px solid #cbd5e1; border-radius: 10px; outline: none; font-size: 14px; }
+        .input-area input:focus { border-color: #6366f1; }
+        .input-area button { padding: 12px 18px; background: #6366f1; color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; }
+        .input-area button:disabled { background: #cbd5e1; }
         
-        /* 人设选择 */
-        .persona-selector { display: flex; gap: 10px; margin-bottom: 15px; }
-        .persona-btn { flex: 1; padding: 10px; border: 2px solid #eee; border-radius: 10px; background: white; cursor: pointer; text-align: center; font-weight: bold; font-size: 14px; transition: 0.2s; }
-        .persona-btn.active { border-color: #ff6b6b; background: #fff0f0; color: #ff6b6b; }
-
-        /* 账单列表 */
-        .feed { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-bottom: 15px; }
-        .card { background: #fafafa; border: 1px solid #eee; border-radius: 12px; padding: 12px 15px; }
-        .card-top { display: flex; justify-content: space-between; font-size: 14px; font-weight: bold; margin-bottom: 6px; }
-        .card-amount { color: #e74c3c; font-size: 16px; }
-        .card-desc { font-size: 13px; color: #666; margin-bottom: 8px; }
-        .ai-box { background: #fff; border-left: 4px solid #ff6b6b; padding: 8px 12px; border-radius: 4px; font-size: 13px; line-height: 1.4; color: #444; }
-        .ai-badge { display: inline-block; background: #ffe3e3; color: #d63031; font-size: 11px; padding: 2px 6px; border-radius: 4px; margin-top: 6px; font-weight: bold; }
-
-        /* 底部输入框 */
-        .input-area { display: flex; gap: 8px; margin-top: auto; padding-top: 10px; border-top: 1px solid #eee; }
-        .input-area input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 8px; outline: none; }
-        .input-area button { padding: 12px 20px; background: #ff6b6b; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        .input-area button:disabled { background: #ccc; }
+        /* 底部数据清空链接 */
+        .clear-link { text-align: center; margin-top: 10px; font-size: 11px; color: #cbd5e1; cursor: pointer; }
     </style>
 </head>
 <body>
 
 <div class="app-container">
     <div class="header">
-        <h1>👩‍❤️‍👨 双人 AI 记账管家</h1>
+        <h1>👩‍❤️‍👨 双人 AI 记账管家 Pro</h1>
     </div>
 
-    <!-- API Key 配置项（保存在本地） -->
-    <div class="config-box">
-        <label>⚙️ API 设置 (Key 保存在本地浏览器)</label>
-        <input type="password" id="apiKey" placeholder="输入你的 API Key (如 DeepSeek / OpenAI)" onchange="saveConfig()">
-        <input type="text" id="apiHost" placeholder="API 接口地址 (默认 DeepSeek: https://api.deepseek.com/v1)" value="https://api.deepseek.com/v1" onchange="saveConfig()">
+    <!-- 看板 -->
+    <div class="dashboard">
+        <div class="dash-title">本月累计总支出</div>
+        <div class="dash-total" id="totalExpense">￥0.00</div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
+        <div class="dash-foot">
+            <span id="budgetPercent">预算使用: 0%</span>
+            <span>月度预设: ￥5,000</span>
+        </div>
     </div>
 
-    <!-- 人设切换 -->
-    <div class="persona-selector">
-        <button class="persona-btn active" id="btnCat" onclick="setPersona('cat')">🐱 毒舌猫管家</button>
-        <button class="persona-btn" id="btnAngel" onclick="setPersona('angel')">👼 夸夸天使</button>
+    <!-- API 设置折叠面板 -->
+    <details class="config-box">
+        <summary>⚙️ 免费 API 平台配置 (选一次即可)</summary>
+        <div class="config-group">
+            <label>1. 选择使用的 AI 平台/模型：</label>
+            <select id="platformPreset" onchange="applyPreset()">
+                <option value="siliconflow-free">【免费推荐】硅基流动 - Qwen2.5 (无需花钱)</option>
+                <option value="siliconflow-ds">【推荐】硅基流动 - DeepSeek-V3</option>
+                <option value="deepseek-official">DeepSeek 官方 API</option>
+                <option value="gemini-free">Google Gemini (需梯子)</option>
+            </select>
+
+            <label>2. 你的 API Key：</label>
+            <input type="password" id="apiKey" placeholder="粘贴你的 API Key (如 sk-xxx)" onchange="saveConfig()">
+            
+            <input type="hidden" id="apiHost">
+            <input type="hidden" id="modelName">
+        </div>
+    </details>
+
+    <!-- 人设选择器 -->
+    <div class="persona-grid">
+        <button class="persona-btn active" id="btn-cat" onclick="setPersona('cat')">🐱 毒舌黑猫</button>
+        <button class="persona-btn" id="btn-angel" onclick="setPersona('angel')">👼 夸夸天使</button>
+        <button class="persona-btn" id="btn-abacus" onclick="setPersona('abacus')">🧮 严厉算盘娘</button>
+        <button class="persona-btn" id="btn-cyber" onclick="setPersona('cyber')">🤖 赛博理财师</button>
     </div>
 
-    <!-- 账单动态列表 -->
-    <div class="feed" id="feedList">
-        <!-- 账单卡片会自动渲染在这里 -->
+    <!-- 快捷填词标签 -->
+    <div class="quick-tags">
+        <div class="tag-chip" onclick="quickFill('今天买奶茶花了 ')">🧋 奶茶</div>
+        <div class="tag-chip" onclick="quickFill('点外卖花了 ')">🍱 外卖</div>
+        <div class="tag-chip" onclick="quickFill('打车花了 ')">🚗 打车</div>
+        <div class="tag-chip" onclick="quickFill('超市买菜花了 ')">🛒 买菜</div>
+        <div class="tag-chip" onclick="quickFill('买衣服花了 ')">👗 购物</div>
     </div>
 
-    <!-- 记账输入框 -->
+    <!-- 账单动态 Feed -->
+    <div class="feed" id="feedList"></div>
+
+    <!-- 底部输入框 -->
     <div class="input-area">
-        <input type="text" id="userInput" placeholder="输入花费，例：今天买奶茶 28" onkeypress="if(event.key==='Enter') addExpense()">
+        <input type="text" id="userInput" placeholder="输入，例如: 刚才买奶茶 28" onkeypress="if(event.key==='Enter') addExpense()">
         <button id="sendBtn" onclick="addExpense()">记账</button>
     </div>
+    
+    <div class="clear-link" onclick="clearAllData()">🗑️ 清空所有本地账单数据</div>
 </div>
 
 <script>
     let currentPersona = 'cat';
-    let expenses = JSON.parse(localStorage.getItem('expenses_history') || '[]');
+    let expenses = JSON.parse(localStorage.getItem('expenses_history_v2') || '[]');
+    const MONTHLY_BUDGET = 5000;
 
-    // 初始化页面
+    // 平台预设字典
+    const presets = {
+        'siliconflow-free': { host: 'https://api.siliconflow.cn/v1', model: 'Qwen/Qwen2.5-7B-Instruct' },
+        'siliconflow-ds': { host: 'https://api.siliconflow.cn/v1', model: 'deepseek-ai/DeepSeek-V3' },
+        'deepseek-official': { host: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
+        'gemini-free': { host: 'https://generativelanguage.googleapis.com/v1beta/openai/', model: 'gemini-1.5-flash' }
+    };
+
     window.onload = function() {
+        const savedPlatform = localStorage.getItem('platform_preset') || 'siliconflow-free';
+        document.getElementById('platformPreset').value = savedPlatform;
         document.getElementById('apiKey').value = localStorage.getItem('api_key') || '';
-        document.getElementById('apiHost').value = localStorage.getItem('api_host') || 'https://api.deepseek.com/v1';
+        applyPreset();
         renderFeed();
     };
 
+    function applyPreset() {
+        const selected = document.getElementById('platformPreset').value;
+        const config = presets[selected];
+        document.getElementById('apiHost').value = config.host;
+        document.getElementById('modelName').value = config.model;
+        localStorage.setItem('platform_preset', selected);
+        saveConfig();
+    }
+
     function saveConfig() {
         localStorage.setItem('api_key', document.getElementById('apiKey').value.trim());
-        localStorage.setItem('api_host', document.getElementById('apiHost').value.trim());
     }
 
     function setPersona(type) {
         currentPersona = type;
-        document.getElementById('btnCat').classList.toggle('active', type === 'cat');
-        document.getElementById('btnAngel').classList.toggle('active', type === 'angel');
+        document.querySelectorAll('.persona-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(`btn-${type}`).classList.add('active');
     }
 
-    // 渲染账单列表
+    function quickFill(text) {
+        const input = document.getElementById('userInput');
+        input.value = text;
+        input.focus();
+    }
+
     function renderFeed() {
         const listEl = document.getElementById('feedList');
         listEl.innerHTML = '';
-        expenses.slice().reverse().forEach(item => {
+        let total = 0;
+
+        expenses.slice().reverse().forEach((item, index) => {
+            const originalIndex = expenses.length - 1 - index;
+            total += Number(item.amount || 0);
+
             const card = document.createElement('div');
             card.className = 'card';
             card.innerHTML = `
-                <div class="card-top">
-                    <span>${item.description}</span>
-                    <span class="card-amount">￥${item.amount}</span>
+                <div class="card-header">
+                    <span class="card-title">${item.description}</span>
+                    <span class="card-amount">￥${Number(item.amount).toFixed(2)}</span>
                 </div>
-                <div class="card-desc">分类：${item.category} | 时间：${item.time}</div>
+                <div class="card-sub">分类: ${item.category} | ${item.time}</div>
                 <div class="ai-box">
                     <strong>${item.personaName}：</strong>${item.aiComment}
-                    <div><span class="ai-badge">${item.badge}</span></div>
+                </div>
+                <div class="card-footer">
+                    <span class="ai-badge">${item.badge}</span>
+                    <button class="btn-delete" onclick="deleteExpense(${originalIndex})">删除</button>
                 </div>
             `;
             listEl.appendChild(card);
         });
+
+        // 更新看板数据
+        document.getElementById('totalExpense').innerText = `￥${total.toFixed(2)}`;
+        const percent = Math.min(Math.round((total / MONTHLY_BUDGET) * 100), 100);
+        document.getElementById('progressFill').style.width = `${percent}%`;
+        document.getElementById('budgetPercent').innerText = `预算已用: ${percent}%`;
     }
 
-    // 调用 AI API 记账
+    function deleteExpense(index) {
+        if(confirm('确定要删除这条记账记录吗？')) {
+            expenses.splice(index, 1);
+            localStorage.setItem('expenses_history_v2', JSON.stringify(expenses));
+            renderFeed();
+        }
+    }
+
+    function clearAllData() {
+        if(confirm('⚠️ 警告：这会清空所有记录的账单，确定吗？')) {
+            expenses = [];
+            localStorage.removeItem('expenses_history_v2');
+            renderFeed();
+        }
+    }
+
     async function addExpense() {
         const inputEl = document.getElementById('userInput');
         const text = inputEl.value.trim();
         const apiKey = document.getElementById('apiKey').value.trim();
-        const apiHost = document.getElementById('apiHost').value.trim();
+        const apiHost = document.getElementById('apiHost').value;
+        const modelName = document.getElementById('modelName').value;
 
         if (!text) return alert('请输入消费内容！');
-        if (!apiKey) return alert('请先在上方填入你的 API Key！');
+        if (!apiKey) return alert('请展开上方设置，填入你的 API Key！');
 
         const sendBtn = document.getElementById('sendBtn');
         sendBtn.disabled = true;
         sendBtn.innerText = '分析中...';
 
-        // 设定 Prompt
-        const systemPrompt = currentPersona === 'cat' 
-            ? `你是一只傲娇毒舌的黑猫财务管家。分析用户的消费文本，精准给出金额、分类、100字以内的毒舌点评，以及一个搞笑勋章。必须严格返回 JSON 格式：{"amount": 数字, "category": "分类", "description": "简短描述", "aiComment": "毒舌点评", "badge": "搞笑勋章"}`
-            : `你是一位温柔治愈的夸夸天使管家。分析用户的消费文本，说明这笔消费有多棒，给出100字以内的极度赞美点评，以及一个浪漫勋章。必须严格返回 JSON 格式：{"amount": 数字, "category": "分类", "description": "简短描述", "aiComment": "夸夸点评", "badge": "浪漫勋章"}`;
+        // 设定 Prompt 字典
+        const prompts = {
+            cat: '你是一只傲娇毒舌的黑猫管家。',
+            angel: '你是一位极其温柔治愈的夸夸天使。',
+            abacus: '你是一位抠门且对每分钱都精打细算的古代算盘娘。',
+            cyber: '你是来自 2077 年的赛博理财人造人，用充满未来科技感和数据的语气点评。'
+        };
+
+        const systemPrompt = `${prompts[currentPersona]} 分析用户的消费文本，提取金额和分类，并给出 80 字以内的特色点评和评价勋章。必须严格只返回 JSON 格式：{"amount": 数字, "category": "分类", "description": "简短名称", "aiComment": "点评", "badge": "勋章"}`;
 
         try {
             const response = await fetch(`${apiHost}/chat/completions`, {
@@ -139,46 +255,46 @@
                     'Authorization': `Bearer ${apiKey}`
                 },
                 body: JSON.stringify({
-model: 'Qwen/Qwen2.5-7B-Instruct',
+                    model: modelName,
                     messages: [
                         { role: 'system', content: systemPrompt },
                         { role: 'user', content: text }
-                    ],
-                    response_format: { type: "json_object" }
+                    ]
                 })
             });
 
             const data = await response.json();
             let resultText = data.choices[0].message.content;
             
-            // 清理可能包含的 markdown 标签
-            resultText = resultText.replace(/```json/g, '').replace(/```/g, '').trim();
-            const res = JSON.parse(resultText);
+            // 提取 JSON 对象，兼容 Markdown 格式包裹
+            const jsonMatch = resultText.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) throw new Error("AI 返回格式解析失败");
+            const res = JSON.parse(jsonMatch[0]);
 
-            // 保存记录
+            const personaNames = { cat: '🐱 毒舌猫', angel: '👼 夸夸天使', abacus: '🧮 算盘娘', cyber: '🤖 赛博理财' };
+
             const newRecord = {
                 amount: res.amount || 0,
-                category: res.category || '日常消费',
+                category: res.category || '日常支出',
                 description: res.description || text,
-                aiComment: res.aiComment || '本喵懒得点评...',
+                aiComment: res.aiComment || '懒得点评...',
                 badge: res.badge || '消费达人',
-                personaName: currentPersona === 'cat' ? '🐱 毒舌猫' : '👼 夸夸天使',
+                personaName: personaNames[currentPersona],
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             };
 
             expenses.push(newRecord);
-            localStorage.setItem('expenses_history', JSON.stringify(expenses));
+            localStorage.setItem('expenses_history_v2', JSON.stringify(expenses));
             
             inputEl.value = '';
             renderFeed();
         } catch (err) {
-            alert('调用 API 失败，请检查 Key 和 Host 是否正确！' + err.message);
+            alert('记账失败：' + err.message + '\n提示：请检查 API Key 是否填对或额度是否充足。');
         } finally {
             sendBtn.disabled = false;
             sendBtn.innerText = '记账';
         }
     }
 </script>
-
 </body>
 </html>
