@@ -84,9 +84,8 @@
             <label>1. 选择使用的 AI 平台/模型：</label>
             <select id="platformPreset" onchange="applyPreset()">
                 <option value="siliconflow-free">【免费推荐】硅基流动 - Qwen2.5 (无需花钱)</option>
-                <option value="siliconflow-ds">【推荐】硅基流动 - DeepSeek-V3</option>
                 <option value="deepseek-official">DeepSeek 官方 API</option>
-                <option value="gemini-free">Google Gemini (需梯子)</option>
+               <option value="zhipu-free">【绝对免费】智谱 GLM-4-Flash (官方永久免费)</option>
             </select>
 
             <label>2. 你的 API Key：</label>
@@ -131,12 +130,11 @@
     let expenses = JSON.parse(localStorage.getItem('expenses_history_v2') || '[]');
     const MONTHLY_BUDGET = 5000;
 
-    // 平台预设字典
+// 平台预设字典（已加入智谱完全免费版）
     const presets = {
+        'zhipu-free': { host: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash' },
         'siliconflow-free': { host: 'https://api.siliconflow.cn/v1', model: 'Qwen/Qwen2.5-7B-Instruct' },
-        'siliconflow-ds': { host: 'https://api.siliconflow.cn/v1', model: 'deepseek-ai/DeepSeek-V3' },
-        'deepseek-official': { host: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
-        'gemini-free': { host: 'https://generativelanguage.googleapis.com/v1beta/openai/', model: 'gemini-1.5-flash' }
+        'deepseek-official': { host: 'https://api.deepseek.com/v1', model: 'deepseek-chat' }
     };
 
     window.onload = function() {
