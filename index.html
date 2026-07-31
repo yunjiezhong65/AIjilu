@@ -3,9 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>👩‍❤️‍👨 双人 AI 记账管家 终极版</title>
-    <!-- 引入 Chart.js 用于绘制消费饼图 -->
+    <title>👩‍❤️‍👨 双人 AI 记账管家 (Firebase 云端互联版)</title>
+    <!-- 引入 Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- 引入 Firebase SDK (Compat 版本，适合单文件 HTML) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f1f5f9; color: #1e293b; padding: 12px; display: flex; justify-content: center; }
@@ -20,27 +23,27 @@
         .progress-bar-fill { background: #34d399; height: 100%; width: 0%; transition: width 0.3s; }
         .budget-input-inline { background: rgba(255,255,255,0.2); border: none; color: white; width: 70px; text-align: right; padding: 2px 4px; border-radius: 4px; font-weight: bold; }
 
+        /* 云端同步指示灯 */
+        .sync-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 10px; }
+        .sync-dot { width: 6px; height: 6px; background: #34d399; border-radius: 50%; }
+
         /* 主导航 Tab */
         .main-tabs { display: flex; border-bottom: 2px solid #f1f5f9; margin-bottom: 12px; }
         .tab-btn { flex: 1; padding: 10px 0; border: none; background: none; font-size: 13px; font-weight: bold; color: #64748b; cursor: pointer; text-align: center; }
         .tab-btn.active { color: #4f46e5; border-bottom: 2px solid #4f46e5; margin-bottom: -2px; }
 
-        /* 内容区域 */
         .tab-content { display: none; flex: 1; overflow-y: auto; flex-direction: column; gap: 12px; }
         .tab-content.active { display: flex; }
 
-        /* 配置折叠面板 */
         details.config-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px; font-size: 12px; margin-bottom: 10px; }
         details summary { font-weight: bold; cursor: pointer; color: #475569; }
         .config-group { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
         .config-group input, .config-group select { padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; }
 
-        /* 人设选择 */
         .persona-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
         .persona-btn { padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: white; cursor: pointer; text-align: center; font-size: 12px; font-weight: 500; }
         .persona-btn.active { border-color: #4f46e5; background: #eef2ff; color: #4f46e5; font-weight: bold; }
 
-        /* 账单分组列表 */
         .date-group-title { font-size: 12px; font-weight: bold; color: #64748b; background: #f1f5f9; padding: 4px 8px; border-radius: 6px; margin-top: 6px; display: flex; justify-content: space-between; }
         .card { background: #fff; border: 1px solid #f1f5f9; box-shadow: 0 2px 6px rgba(0,0,0,0.02); border-radius: 12px; padding: 12px; margin-top: 6px; }
         .card-header { display: flex; justify-content: space-between; font-weight: bold; font-size: 14px; }
@@ -51,12 +54,10 @@
         .ai-badge { background: #e0e7ff; color: #4338ca; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
         .btn-delete { color: #94a3b8; font-size: 11px; border: none; background: none; cursor: pointer; }
 
-        /* 可视化与 AI 报告容器 */
         .chart-box, .report-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; text-align: center; }
         .report-content { text-align: left; font-size: 13px; line-height: 1.6; color: #334155; white-space: pre-line; background: #f8fafc; padding: 12px; border-radius: 8px; margin-top: 10px; }
         .btn-action { background: #4f46e5; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 8px; }
 
-        /* 底部固定输入栏 */
         .input-area { display: flex; gap: 6px; margin-top: auto; padding-top: 10px; border-top: 1px solid #f1f5f9; align-items: center; }
         .btn-mic { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px; cursor: pointer; font-size: 16px; }
         .btn-mic.recording { background: #fee2e2; border-color: #ef4444; animation: pulse 1s infinite; }
@@ -69,16 +70,18 @@
 <body>
 
 <div class="app-container">
-    <!-- 看板 -->
     <div class="dashboard">
         <div class="dash-row">
-            <span class="dash-title">本月累计总支出 (留存最近半数据)</span>
+            <span class="dash-title">本月累计总支出</span>
+            <div class="sync-badge"><div class="sync-dot"></div> 云端实时同步中</div>
+        </div>
+        <div class="dash-row">
+            <div class="dash-total" id="totalExpense">￥0.00</div>
             <div>
                 <span class="dash-title">月预算 ￥</span>
                 <input type="number" id="budgetInput" class="budget-input-inline" value="5000" onchange="updateBudget()">
             </div>
         </div>
-        <div class="dash-total" id="totalExpense">￥0.00</div>
         <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
         <div class="dash-row" style="font-size: 11px; opacity: 0.9;">
             <span id="budgetPercent">预算使用: 0%</span>
@@ -86,16 +89,14 @@
         </div>
     </div>
 
-    <!-- 顶部分页 Tab -->
     <div class="main-tabs">
-        <button class="tab-btn active" onclick="switchTab('feed')">📝 明细</button>
+        <button class="tab-btn active" onclick="switchTab('feed')">📝 云端明细</button>
         <button class="tab-btn" onclick="switchTab('chart')">📊 分类饼图</button>
         <button class="tab-btn" onclick="switchTab('report')">🏆 AI 颁奖月报</button>
     </div>
 
     <!-- TAB 1: 账单明细列表 -->
     <div id="tab-feed" class="tab-content active">
-        <!-- API 配置 -->
         <details class="config-box">
             <summary>⚙️ API 平台与人设设置</summary>
             <div class="config-group">
@@ -111,7 +112,6 @@
             </div>
         </details>
 
-        <!-- 人设选择 -->
         <div class="persona-grid">
             <button class="persona-btn active" id="btn-cat" onclick="setPersona('cat')">🐱 毒舌黑猫</button>
             <button class="persona-btn" id="btn-angel" onclick="setPersona('angel')">👼 夸夸天使</button>
@@ -119,7 +119,7 @@
             <button class="persona-btn" id="btn-cyber" onclick="setPersona('cyber')">🤖 赛博理财</button>
         </div>
 
-        <div id="feedList"></div>
+        <div id="feedList">云端数据加载中...</div>
     </div>
 
     <!-- TAB 2: 可视化饼图 -->
@@ -134,13 +134,13 @@
     <div id="tab-report" class="tab-content">
         <div class="report-box">
             <h3>🏆 双人月度消费颁奖典礼</h3>
-            <p style="font-size: 12px; color: #64748b; margin: 6px 0;">一键让 AI 深度梳理近 30 天账单，生成专属总结与奖项</p>
+            <p style="font-size: 12px; color: #64748b; margin: 6px 0;">一键让 AI 深度梳理云端账单，生成专属总结与奖项</p>
             <button class="btn-action" id="genReportBtn" onclick="generateMonthlyReport()">✨ 召唤 AI 生成颁奖总结</button>
             <div class="report-content" id="reportResult" style="display:none;"></div>
         </div>
     </div>
 
-    <!-- 底部输入框（带语音识别） -->
+    <!-- 底部输入框 -->
     <div class="input-area">
         <button class="btn-mic" id="micBtn" onclick="toggleVoiceInput()" title="按住语音输入">🎙️</button>
         <input type="text" id="userInput" placeholder="输入或语音，例: 打车 35" onkeypress="if(event.key==='Enter') addExpense()">
@@ -149,9 +149,27 @@
 </div>
 
 <script>
+    // -------------------------------------------------------------
+    // ⚠️ 请把下面这部分替换为你从 Firebase 控制台复制的真实 firebaseConfig！
+    // -------------------------------------------------------------
+const firebaseConfig = {
+  apiKey: "AIzaSyAMl602ml7-qlpsr6kvy8t7lTwZMbjEz74",
+  authDomain: "aijizhangben.firebaseapp.com",
+  databaseURL: "https://aijizhangben-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "aijizhangben",
+  storageBucket: "aijizhangben.firebasestorage.app",
+  messagingSenderId: "675335378451",
+  appId: "1:675335378451:web:e87ad4bffc06af744011e6",
+  measurementId: "G-P9Y453SCVR"
+};
+
+    // 初始化 Firebase 和 Firestore 数据库
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
     let currentPersona = 'cat';
     let expenses = [];
-    let monthlyBudget = Number(localStorage.getItem('monthly_budget') || 5000);
+    let monthlyBudget = 5000;
     let chartInstance = null;
     let isRecording = false;
     let recognition = null;
@@ -163,30 +181,42 @@
     };
 
     window.onload = function() {
-        // 读取并清理过期（超过6个月/180天）数据
-        loadAndCleanExpenses();
-        
-        document.getElementById('budgetInput').value = monthlyBudget;
         document.getElementById('platformPreset').value = localStorage.getItem('platform_preset') || 'zhipu-free';
         document.getElementById('apiKey').value = localStorage.getItem('api_key') || '';
         applyPreset();
-        renderFeed();
         initSpeechRecognition();
+
+        // 监听云端【预算设置】
+        db.collection('settings').doc('budget').onSnapshot(doc => {
+            if(doc.exists) {
+                monthlyBudget = doc.data().value || 5000;
+                document.getElementById('budgetInput').value = monthlyBudget;
+                renderFeed();
+            }
+        });
+
+        // 监听云端【账单数据】(秒级实时更新，只读最近半年的数据)
+        const sixMonthsAgo = Date.now() - (180 * 24 * 60 * 60 * 1000);
+        db.collection('expenses')
+          .where('timestamp', '>=', sixMonthsAgo)
+          .onSnapshot(snapshot => {
+              expenses = [];
+              snapshot.forEach(doc => {
+                  expenses.push({ id: doc.id, ...doc.data() });
+              });
+              // 按时间降序
+              expenses.sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0));
+              renderFeed();
+          }, err => {
+              console.error("Firebase 读取失败，请检查配置或规则", err);
+              document.getElementById('feedList').innerText = "加载失败，请检查 Firebase 配置。";
+          });
     };
 
-    // 1. 数据清理与读取（只留半年数据）
-    function loadAndCleanExpenses() {
-        const raw = JSON.parse(localStorage.getItem('expenses_history_v3') || '[]');
-        const sixMonthsAgo = Date.now() - (180 * 24 * 60 * 60 * 1000);
-        // 过滤 180 天以内数据
-        expenses = raw.filter(item => (item.timestamp || Date.now()) >= sixMonthsAgo);
-        localStorage.setItem('expenses_history_v3', JSON.stringify(expenses));
-    }
-
+    // 云端更新预算
     function updateBudget() {
-        monthlyBudget = Number(document.getElementById('budgetInput').value) || 5000;
-        localStorage.setItem('monthly_budget', monthlyBudget);
-        renderFeed();
+        const val = Number(document.getElementById('budgetInput').value) || 5000;
+        db.collection('settings').doc('budget').set({ value: val });
     }
 
     function applyPreset() {
@@ -218,24 +248,21 @@
         if(tabName === 'chart') renderChart();
     }
 
-    // 2. 语音识别支持 (Web Speech API)
+    // 语音识别逻辑
     function initSpeechRecognition() {
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
             const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
             recognition = new SpeechRec();
             recognition.lang = 'zh-CN';
-            recognition.continuous = false;
             
             recognition.onresult = function(event) {
-                const text = event.results[0][0].transcript;
-                document.getElementById('userInput').value = text;
+                document.getElementById('userInput').value = event.results[0][0].transcript;
                 stopVoiceInput();
             };
-            
             recognition.onerror = stopVoiceInput;
             recognition.onend = stopVoiceInput;
         } else {
-            document.getElementById('micBtn').style.display = 'none'; // 浏览器不支持则隐藏
+            document.getElementById('micBtn').style.display = 'none';
         }
     }
 
@@ -246,9 +273,7 @@
             recognition.start();
             isRecording = true;
             micBtn.classList.add('recording');
-        } else {
-            stopVoiceInput();
-        }
+        } else { stopVoiceInput(); }
     }
 
     function stopVoiceInput() {
@@ -257,19 +282,17 @@
         document.getElementById('micBtn').classList.remove('recording');
     }
 
-    // 3. 渲染明细列表（按日分组）
+    // 渲染 UI 明细
     function renderFeed() {
         const listEl = document.getElementById('feedList');
         listEl.innerHTML = '';
         let monthTotal = 0;
 
-        // 按日期分组数据
         const groups = {};
-        expenses.slice().reverse().forEach((item, idx) => {
-            const originalIndex = expenses.length - 1 - idx;
+        expenses.slice().reverse().forEach(item => {
             const dateStr = item.date || '未知日期';
             if(!groups[dateStr]) groups[dateStr] = { items: [], dayTotal: 0 };
-            groups[dateStr].items.push({ ...item, originalIndex });
+            groups[dateStr].items.push(item);
             groups[dateStr].dayTotal += Number(item.amount || 0);
             monthTotal += Number(item.amount || 0);
         });
@@ -295,7 +318,7 @@
                     <div class="ai-box"><strong>${item.personaName}：</strong>${item.aiComment}</div>
                     <div class="card-footer">
                         <span class="ai-badge">${item.badge}</span>
-                        <button class="btn-delete" onclick="deleteExpense(${item.originalIndex})">删除</button>
+                        <button class="btn-delete" onclick="deleteExpense('${item.id}')">删除</button>
                     </div>
                 `;
                 groupEl.appendChild(card);
@@ -303,7 +326,6 @@
             listEl.appendChild(groupEl);
         }
 
-        // 更新看板数据
         document.getElementById('totalExpense').innerText = `￥${monthTotal.toFixed(2)}`;
         const percent = Math.min(Math.round((monthTotal / monthlyBudget) * 100), 100);
         document.getElementById('progressFill').style.width = `${percent}%`;
@@ -311,15 +333,13 @@
         document.getElementById('budgetRemain').innerText = `剩余: ￥${(monthlyBudget - monthTotal).toFixed(2)}`;
     }
 
-    function deleteExpense(index) {
-        if(confirm('确定要删除这条记账记录吗？')) {
-            expenses.splice(index, 1);
-            localStorage.setItem('expenses_history_v3', JSON.stringify(expenses));
-            renderFeed();
+    // 从云端数据库删除
+    function deleteExpense(docId) {
+        if(confirm('确定要从云端删除这条记录吗？对方也会同步删除哦！')) {
+            db.collection('expenses').doc(docId).delete();
         }
     }
 
-    // 4. 可视化图表渲染 (Chart.js)
     function renderChart() {
         const ctx = document.getElementById('categoryChart').getContext('2d');
         const categoryTotals = {};
@@ -347,23 +367,22 @@
         });
     }
 
-    // 5. 召唤 AI 生成月度颁奖总结
     async function generateMonthlyReport() {
         const apiKey = document.getElementById('apiKey').value.trim();
         const apiHost = document.getElementById('apiHost').value;
         const modelName = document.getElementById('modelName').value;
 
         if(!apiKey) return alert('请先在明细设置里填入 API Key！');
-        if(expenses.length === 0) return alert('还没有记账数据，先去记几笔吧！');
+        if(expenses.length === 0) return alert('数据库里还没有数据，先去记几笔吧！');
 
         const btn = document.getElementById('genReportBtn');
         const resEl = document.getElementById('reportResult');
         btn.disabled = true; btn.innerText = 'AI 正在撰写颁奖词...';
 
         const summaryData = expenses.map(e => `${e.date} ${e.description} ￥${e.amount} (${e.category})`).join('\n');
-        const prompt = `你是一位幽默风趣的高情商情侣财务管家。请分析以下这对情侣近期的账单明细数据，为他们撰写一份《月度消费颁奖典礼与情侣报告》。
+        const prompt = `你是一位幽默风趣的高情商情侣财务管家。请分析以下这对情侣近期的云端账单明细，为他们撰写一份《月度消费颁奖典礼与情侣报告》。
 结构要求：
-1. 🏆 颁发 2~3 个搞笑搞笑极具特色的消费奖项（例如“最高单笔败家奖”、“最强续命奖”等）。
+1. 🏆 颁发 2~3 个搞笑极具特色的消费奖项。
 2. 💡 对两人的消费结构进行幽默点评与未来建议。
 3. 💕 给予一句关于爱情与生活的温馨祝福。
 账单数据：\n${summaryData}`;
@@ -388,7 +407,7 @@
         }
     }
 
-    // 6. 添加记账核心逻辑
+    // 核心：记账并写入 Firebase 云数据库
     async function addExpense() {
         const inputEl = document.getElementById('userInput');
         const text = inputEl.value.trim();
@@ -402,7 +421,8 @@
         const sendBtn = document.getElementById('sendBtn');
         sendBtn.disabled = true; sendBtn.innerText = '分析中...';
 
-        const systemPrompt = `分析用户的消费文本，提取金额和分类，并给出 80 字以内的特色点评和评价勋章。必须严格只返回 JSON 格式：{"amount": 数字, "category": "餐饮/购物/交通/娱乐/日用/其他", "description": "简短名称", "aiComment": "点评", "badge": "勋章"}`;
+        // 包含细化分类的 Prompt
+        const systemPrompt = `分析用户的消费文本，提取金额和分类，并给出 80 字以内的特色点评和评价勋章。必须严格只返回 JSON 格式：{"amount": 数字, "category": "☕咖啡奶茶/🍱正餐外卖/🍲约会大餐/👗服饰美妆/🚗交通出行/🎬电影娱乐/🏠日用家居/🐱宠物开销/其他", "description": "简短名称", "aiComment": "点评", "badge": "勋章"}`;
 
         try {
             const response = await fetch(`${apiHost}/chat/completions`, {
@@ -429,18 +449,17 @@
                 aiComment: res.aiComment || '懒得点评...',
                 badge: res.badge || '消费达人',
                 personaName: personaNames[currentPersona],
-                date: now.toISOString().split('T')[0], // YYYY-MM-DD
+                date: now.toISOString().split('T')[0],
                 time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                timestamp: Date.now() // 时间戳用于半年数据过滤
+                timestamp: Date.now()
             };
 
-            expenses.push(newRecord);
-            localStorage.setItem('expenses_history_v3', JSON.stringify(expenses));
+            // 直接写入云端数据库！
+            await db.collection('expenses').add(newRecord);
             
             inputEl.value = '';
-            renderFeed();
         } catch (err) {
-            alert('记账失败，请检查 Key 或网络：' + err.message);
+            alert('记账失败：' + err.message);
         } finally {
             sendBtn.disabled = false; sendBtn.innerText = '记账';
         }
