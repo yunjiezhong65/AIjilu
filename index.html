@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>👩‍❤️‍👨 双人 AI 记账管家 (智能逻辑矫正版)</title>
+    <title>👩‍❤️‍👨 双人 AI 记账管家 (国内免翻墙直连版)</title>
     <!-- Chart.js 图表库 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Firebase 云数据库 SDK (Compat 版本) -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <!-- Supabase JS SDK v2 (国内直连 CDN) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-client@2"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f1f5f9; color: #1e293b; padding: 12px; display: flex; justify-content: center; }
@@ -52,7 +51,7 @@
         .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
         .ai-badge { background: #e0e7ff; color: #4338ca; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
 
-        /* 历史天数总结横幅卡片 */
+        /* 历史天数总结横幅 */
         .day-banner { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 14px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s; }
         .day-banner:hover { border-color: #6366f1; background: #f8fafc; transform: translateY(-1px); }
         .day-banner-date { font-weight: bold; font-size: 15px; color: #0f172a; }
@@ -93,7 +92,7 @@
     <div class="dashboard">
         <div class="dash-row">
             <span class="dash-title">本月累计总支出</span>
-            <div class="sync-badge"><div class="sync-dot"></div> 云端实时同步中</div>
+            <div class="sync-badge"><div class="sync-dot"></div> 免翻墙秒级同步中</div>
         </div>
         <div class="dash-row">
             <div class="dash-total" id="totalExpense">￥0.00</div>
@@ -248,21 +247,13 @@
 
 <script>
     // -------------------------------------------------------------
-    // Firebase 云数据库配置密钥
+    // ⚠️ 替换为你从 Supabase 控制台复制的 URL 和 anon Key：
     // -------------------------------------------------------------
-    const firebaseConfig = {
-        apiKey: "AIzaSyAML602ml7-qlpsr6kvy8t7lTwZMbjEz74",
-        authDomain: "aijizhangben.firebaseapp.com",
-        databaseURL: "https://aijizhangben-default-rtdb.asia-southeast1.firebasedatabase.app",
-        projectId: "aijizhangben",
-        storageBucket: "aijizhangben.firebasestorage.app",
-        messagingSenderId: "675335378451",
-        appId: "1:675335378451:web:e87ad4bffc06af744011e6",
-        measurementId: "G-P9Y453SCVR"
-    };
+    const SUPABASE_URL = "https://iwkxtadpwylevprczxsz.supabase.co/rest/v1/";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml3a3h0YWRwd3lsZXZwcmN6eHN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4Mjk3MzQsImV4cCI6MjEwMTQwNTczNH0.hLrPvB43rmCjiMlwQCe5lPmy6ilyC3wD7ytsV14tSOE";
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
+    // 初始化 Supabase 客户端
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     let currentPersona = 'cat';
     let expenses = [];
@@ -289,34 +280,71 @@
         applyPreset();
         initSpeechRecognition();
 
-        // 监听云端预算设置
-        db.collection('settings').doc('budget').onSnapshot(doc => {
-            if(doc.exists) {
-                monthlyBudget = doc.data().value || 2500;
-                document.getElementById('budgetInput').value = monthlyBudget;
-                updateDashboardTotal();
-            }
-        });
+        // 1. 加载云端预算与账单数据
+        loadBudget();
+        fetchExpenses();
 
-        // 监听云端数据实时变动（半年内）
-        const sixMonthsAgo = Date.now() - (180 * 24 * 60 * 60 * 1000);
-        db.collection('expenses')
-          .where('timestamp', '>=', sixMonthsAgo)
-          .onSnapshot(snapshot => {
-              expenses = [];
-              snapshot.forEach(doc => { expenses.push({ id: doc.id, ...doc.data() }); });
-              expenses.sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0));
-              
-              renderTodayFeed();
-              renderHistoryBanners();
-              if(selectedDetailDate) renderDayDetail(selectedDetailDate);
-              updateDashboardTotal();
-          });
+        // 2. 开启 Supabase Realtime 免翻墙秒级广播监听
+        subscribeRealtime();
     };
 
-    function updateBudget() {
+    // 从 Supabase 获取预算
+    async function loadBudget() {
+        const { data } = await supabase.from('settings').select('*').eq('id', 'budget').single();
+        if (data) {
+            monthlyBudget = Number(data.value) || 2500;
+            document.getElementById('budgetInput').value = monthlyBudget;
+            updateDashboardTotal();
+        }
+    }
+
+    // 从 Supabase 获取账单（半年内）
+    async function fetchExpenses() {
+        const sixMonthsAgo = Date.now() - (180 * 24 * 60 * 60 * 1000);
+        const { data, error } = await supabase
+            .from('expenses')
+            .select('*')
+            .gte('timestamp', sixMonthsAgo)
+            .order('timestamp', { ascending: true });
+
+        if (!error && data) {
+            expenses = data.map(item => ({
+                id: item.id,
+                amount: item.amount,
+                category: item.category,
+                description: item.description,
+                aiComment: item.ai_comment,
+                badge: item.badge,
+                personaName: item.persona_name,
+                date: item.date,
+                time: item.time,
+                timestamp: item.timestamp
+            }));
+
+            // 实时刷新 UI
+            renderTodayFeed();
+            renderHistoryBanners();
+            if(selectedDetailDate) renderDayDetail(selectedDetailDate);
+            updateDashboardTotal();
+        }
+    }
+
+    // 订阅广播变化
+    function subscribeRealtime() {
+        supabase
+            .channel('public:expenses')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, payload => {
+                fetchExpenses();
+            })
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, payload => {
+                loadBudget();
+            })
+            .subscribe();
+    }
+
+    async function updateBudget() {
         const val = Number(document.getElementById('budgetInput').value) || 2500;
-        db.collection('settings').doc('budget').set({ value: val });
+        await supabase.from('settings').upsert({ id: 'budget', value: val });
     }
 
     function applyPreset() {
@@ -529,20 +557,20 @@
         if (newAmount <= 0) return alert('金额必须大于 0 元！');
 
         try {
-            await db.collection('expenses').doc(docId).update({
+            await supabase.from('expenses').update({
                 description: newDesc,
                 amount: newAmount,
                 category: newCategory
-            });
+            }).eq('id', docId);
             closeEditModal();
         } catch (err) {
             alert('修改失败：' + err.message);
         }
     }
 
-    function deleteExpense(docId) {
+    async function deleteExpense(docId) {
         if(confirm('确定要从云端删除这条记录吗？对方的手机上也会同步删除哦！')) {
-            db.collection('expenses').doc(docId).delete();
+            await supabase.from('expenses').delete().eq('id', docId);
         }
     }
 
@@ -598,7 +626,7 @@
         }
     }
 
-    // 📷 拍照小票识别 (矫正识图分类规则)
+    // 📷 拍照小票识别
     async function processReceiptImage(event) {
         const file = event.target.files[0];
         if (!file) return;
@@ -619,11 +647,10 @@
         reader.onload = async function(e) {
             const base64Image = e.target.result;
             
-            // 🌟 核心识图分类逻辑矫正 🌟
             const systemPrompt = `分析小票图片，提取每个商品明细。分类必须严格按照以下标准选择（不能混淆）：
 - 🥦生鲜食材：纯食材/生鲜食材。特别规则：凡是纯食材名称（如猪肉、牛肉、鸡肉、羊肉、蔬菜、娃娃菜、鸡蛋、鱼、虾等），即便没带“生”字，也必须强行归为【🥦生鲜食材】！严禁归为正餐外卖！
 - 🍱正餐外卖：做好的现成菜品/主食/快餐/外卖（如猪脚饭、牛肉煲仔饭、黄焖鸡米饭、炒面、快餐、外卖等）。
-- 🍰零食甜品：蛋糕、面包、烘焙糕点、甜点、坚果薯片、零食熟食。
+- 🍰零食甜点：蛋糕、面包、烘焙糕点、甜点、坚果薯片、零食熟食。
 - ☕咖啡奶茶：咖啡、奶茶、果茶、饮品饮料。
 - 🍲约会大餐：火锅、烧烤、情侣约会大餐、精致餐厅聚餐。
 - 🌾粮油调味：米面、食用油、调味料、干货、冲调麦片。
@@ -658,17 +685,17 @@
 
                 for (const item of items) {
                     if (!item.amount || item.amount <= 0) continue;
-                    await db.collection('expenses').add({
+                    await supabase.from('expenses').insert([{
                         amount: Number(item.amount) || 0,
                         category: item.category || '🥦生鲜食材',
                         description: item.description || '小票商品',
-                        aiComment: item.aiComment || '小票识别记录',
+                        ai_comment: item.aiComment || '小票识别记录',
                         badge: item.badge || '小票达人',
-                        personaName: personaNames[currentPersona],
+                        persona_name: personaNames[currentPersona],
                         date: now.toISOString().split('T')[0],
                         time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                         timestamp: Date.now() + count
-                    });
+                    }]);
                     count++;
                 }
                 alert(`🎉 成功识别小票！已精准拆分记录了 ${count} 笔消费！`);
@@ -711,7 +738,7 @@
         document.getElementById('micBtn').classList.remove('recording');
     }
 
-    // ✏️ 文本记账 (矫正分类判定 Prompt)
+    // ✏️ 文本记账
     async function addExpense() {
         const inputEl = document.getElementById('userInput');
         const text = inputEl.value.trim();
@@ -725,13 +752,12 @@
         const sendBtn = document.getElementById('sendBtn');
         sendBtn.disabled = true; sendBtn.innerText = '分析中...';
 
-        // 🌟 核心文本记账分类逻辑矫正 🌟
         const systemPrompt = `分析用户的消费文本，提取金额和分类，并给出 80 字以内的特色点评和评价勋章。
 
 分类必须严格按照以下标准精确归类（严禁混淆）：
 - 🥦生鲜食材：纯食材/生鲜食材。特别规则：凡是纯食材名词（如猪肉、牛肉、鸡肉、羊肉、蔬菜、娃娃菜、鸡蛋、鱼、虾等），即便没带“生”字，也必须强行归为【🥦生鲜食材】！严禁归为正餐外卖！
 - 🍱正餐外卖：做好的现成菜品/主食/快餐/外卖（如猪脚饭、牛肉煲仔饭、黄焖鸡米饭、炒面、快餐、外卖等）。
-- 🍰零食甜品：蛋糕、面包、烘焙糕点、甜品、坚果薯片、冰淇淋、零食熟食。
+- 🍰零食甜品：蛋糕、面包、烘焙糕点、甜点、坚果薯片、冰淇淋、零食熟食。
 - ☕咖啡奶茶：咖啡、奶茶、果茶、饮品饮料、下午茶。
 - 🍲约会大餐：火锅、烧烤、情侣约会大餐、精致餐厅聚餐。
 - 🌾粮油调味：米面、食用油、调味料、干货、冲调麦片。
@@ -758,17 +784,17 @@
             const personaNames = { cat: '🐱 毒舌猫', angel: '👼 夸夸天使', abacus: '🧮 算盘娘', cyber: '🤖 赛博理财' };
             const now = new Date();
 
-            await db.collection('expenses').add({
+            await supabase.from('expenses').insert([{
                 amount: res.amount || 0,
                 category: res.category || '其他',
                 description: res.description || text,
-                aiComment: res.aiComment || '点评...',
+                ai_comment: res.aiComment || '点评...',
                 badge: res.badge || '消费达人',
-                personaName: personaNames[currentPersona],
+                persona_name: personaNames[currentPersona],
                 date: now.toISOString().split('T')[0],
                 time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 timestamp: Date.now()
-            });
+            }]);
 
             inputEl.value = '';
         } catch (err) {
