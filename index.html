@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>👩‍❤️‍👨 双人 AI 记账管家 (精细分类版)</title>
+    <title>👩‍❤️‍👨 双人 AI 记账管家 (精准生活分类版)</title>
     <!-- Chart.js 图表库 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Firebase 云数据库 SDK (Compat 版本) -->
@@ -99,13 +99,13 @@
             <div class="dash-total" id="totalExpense">￥0.00</div>
             <div>
                 <span class="dash-title">月预算 ￥</span>
-                <input type="number" id="budgetInput" class="budget-input-inline" value="5000" onchange="updateBudget()">
+                <input type="number" id="budgetInput" class="budget-input-inline" value="2500" onchange="updateBudget()">
             </div>
         </div>
         <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
         <div class="dash-row" style="font-size: 11px; opacity: 0.9;">
             <span id="budgetPercent">预算使用: 0%</span>
-            <span id="budgetRemain">剩余: ￥5000</span>
+            <span id="budgetRemain">剩余: ￥2500</span>
         </div>
     </div>
 
@@ -204,12 +204,12 @@
         <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;" onchange="processReceiptImage(event)">
         <button class="btn-icon" onclick="document.getElementById('cameraInput').click()" title="拍照/上传小票">📷</button>
         <button class="btn-icon" id="micBtn" onclick="toggleVoiceInput()" title="按住语音输入">🎙️</button>
-        <input type="text" id="userInput" placeholder="输入或📷拍照小票，例: 打车 35" onkeypress="if(event.key==='Enter') addExpense()">
+        <input type="text" id="userInput" placeholder="输入或📷拍照小票，例: 蛋糕 35" onkeypress="if(event.key==='Enter') addExpense()">
         <button class="send" id="sendBtn" onclick="addExpense()">记账</button>
     </div>
 </div>
 
-<!-- 🌟 修改账单记录弹窗 (包含了完整的 13 种精细分类) 🌟 -->
+<!-- 🌟 修改账单记录弹窗 🌟 -->
 <div class="modal-overlay" id="editModal">
     <div class="modal-card">
         <h3 style="font-size: 15px; color: #0f172a; margin-bottom: 12px;">✏️ 修改账单记录</h3>
@@ -223,18 +223,18 @@
             </label>
             <label style="color:#64748b;">精细消费分类：
                 <select id="editCategory" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; margin-top:4px;">
-                    <option value="🥦生鲜食材">🥦 生鲜食材 (蔬菜/水果/肉类)</option>
-                    <option value="🌾粮油调味">🌾 粮油调味 (米面/油/酱料)</option>
-                    <option value="🛒超市零食">🛒 超市零食 (饮料/零食/熟食)</option>
-                    <option value="🧻日用百货">🧻 日用百货 (纸巾/清洁洗护)</option>
-                    <option value="🏠厨具家电">🏠 厨具家电 (菜刀/锅具/餐具)</option>
-                    <option value="☕咖啡奶茶">☕ 咖啡奶茶</option>
-                    <option value="🍱正餐外卖">🍱 正餐外卖</option>
-                    <option value="🍲约会大餐">🍲 约会大餐</option>
-                    <option value="👗服饰美妆">👗 服饰美妆</option>
-                    <option value="🚗交通出行">🚗 交通出行</option>
-                    <option value="🎬电影娱乐">🎬 电影娱乐</option>
-                    <option value="🐱宠物开销">🐱 宠物开销</option>
+                    <option value="🍰零食甜品">🍰 零食甜品 (蛋糕/面包/甜点/零食)</option>
+                    <option value="☕咖啡奶茶">☕ 咖啡奶茶 (咖啡/奶茶/饮品/下午茶)</option>
+                    <option value="🍱正餐外卖">🍱 正餐外卖 (早餐/午餐/晚餐/快餐)</option>
+                    <option value="🍲约会大餐">🍲 约会大餐 (火锅/烧烤/聚餐大餐)</option>
+                    <option value="🥦生鲜食材">🥦 生鲜食材 (蔬菜/水果/生肉/蛋类)</option>
+                    <option value="🌾粮油调味">🌾 粮油调味 (米面/食用油/酱料调料)</option>
+                    <option value="🧻日用百货">🧻 日用百货 (纸巾/洗洁精/清洁用品)</option>
+                    <option value="🏠厨具家电">🏠 厨具家电 (菜刀/锅具/餐具小家电)</option>
+                    <option value="👗服饰美妆">👗 服饰美妆 (衣服/鞋包/护肤彩妆)</option>
+                    <option value="🚗交通出行">🚗 交通出行 (打车/滴滴/公交/加油)</option>
+                    <option value="🎬电影娱乐">🎬 电影娱乐 (电影/游戏/演出/会员)</option>
+                    <option value="🐱宠物开销">🐱 宠物开销 (猫粮/狗粮/宠物用品)</option>
                     <option value="其他">其他</option>
                 </select>
             </label>
@@ -266,7 +266,7 @@
 
     let currentPersona = 'cat';
     let expenses = [];
-    let monthlyBudget = 5000;
+    let monthlyBudget = 2500;
     
     // 图表句柄
     let monthlyChartInstance = null;
@@ -292,7 +292,7 @@
         // 监听云端预算设置
         db.collection('settings').doc('budget').onSnapshot(doc => {
             if(doc.exists) {
-                monthlyBudget = doc.data().value || 5000;
+                monthlyBudget = doc.data().value || 2500;
                 document.getElementById('budgetInput').value = monthlyBudget;
                 updateDashboardTotal();
             }
@@ -316,7 +316,7 @@
     };
 
     function updateBudget() {
-        const val = Number(document.getElementById('budgetInput').value) || 5000;
+        const val = Number(document.getElementById('budgetInput').value) || 2500;
         db.collection('settings').doc('budget').set({ value: val });
     }
 
@@ -356,7 +356,7 @@
         if(tabName === 'chart') renderMonthlyChart();
     }
 
-    // 渲染饼图工具函数 (调色盘扩充至 13 种鲜艳颜色)
+    // 渲染饼图工具函数
     function renderPieChart(canvasId, items, existingChartInstance) {
         const ctx = document.getElementById(canvasId).getContext('2d');
         const categoryTotals = {};
@@ -378,8 +378,8 @@
                 datasets: [{
                     data: data,
                     backgroundColor: [
-                        '#10b981', '#f59e0b', '#ec4899', '#64748b', '#8b5cf6', 
-                        '#6366f1', '#f97316', '#ef4444', '#a855f7', '#06b6d4', 
+                        '#ec4899', '#f59e0b', '#6366f1', '#ef4444', '#10b981', 
+                        '#f97316', '#64748b', '#8b5cf6', '#a855f7', '#06b6d4', 
                         '#3b82f6', '#eab308', '#94a3b8'
                     ]
                 }]
@@ -605,7 +605,7 @@
         }
     }
 
-    // 📷 拍照小票识别 (注入精细分类系统 Prompt)
+    // 📷 拍照小票识别 (注入超严谨分类标准)
     async function processReceiptImage(event) {
         const file = event.target.files[0];
         if (!file) return;
@@ -626,10 +626,24 @@
         reader.onload = async function(e) {
             const base64Image = e.target.result;
             
-            // 🌟 精细分类识别 Prompt 🌟
-            const systemPrompt = `分析小票图片，提取每个商品明细。允许分类必须且只能在以下列表中选择：🥦生鲜食材/🌾粮油调味/🛒超市零食/🧻日用百货/🏠厨具家电/☕咖啡奶茶/🍱正餐外卖/🍲约会大餐/👗服饰美妆/🚗交通出行/🎬电影娱乐/🐱宠物开销/其他。
+            // 🌟 深度优化的识图分类 Prompt 🌟
+            const systemPrompt = `分析小票图片，提取每个商品明细。分类必须严格按照以下标准选择并精确对应（不能混淆）：
+- 🍰零食甜品：蛋糕、面包、烘焙糕点、甜品、坚果薯片、零食熟食 (特别强调：蛋糕、面包类必须归为此类！)
+- ☕咖啡奶茶：咖啡、奶茶、果茶、饮料、下午茶饮品
+- 🍱正餐外卖：早餐、午餐、晚餐、快餐盒饭、正餐外卖 (强调：仅限正餐，不含蛋糕奶茶)
+- 🍲约会大餐：火锅、烧烤、情侣约会大餐、精致餐厅聚餐
+- 🥦生鲜食材：蔬菜、生鲜水果、生肉类、海鲜、蛋类
+- 🌾粮油调味：米面、食用油、调味料、干货、冲调麦片
+- 🧻日用百货：纸巾、抽纸、洗洁精、洗衣液、清洁洗护
+- 🏠厨具家电：菜刀、锅具、餐具、厨房小家电
+- 👗服饰美妆：衣服、鞋包、护肤彩妆
+- 🚗交通出行：打车、滴滴、公交地铁、加油停车
+- 🎬电影娱乐：电影票、游戏氪金、演出、会员充值
+- 🐱宠物开销：猫粮、狗粮、宠物用品
+- 其他：杂项开销
+
 必须严格只返回 JSON 数组格式，不要包含 Markdown 标记：
-[{"amount":12.5, "category":"🥦生鲜食材", "description":"西红柿", "aiComment":"短评", "badge":"勋章"}]`;
+[{"amount":12.5, "category":"🍰零食甜品", "description":"生日蛋糕", "aiComment":"短评", "badge":"勋章"}]`;
 
             try {
                 const response = await fetch(`${apiHost}/chat/completions`, {
@@ -653,7 +667,7 @@
                     if (!item.amount || item.amount <= 0) continue;
                     await db.collection('expenses').add({
                         amount: Number(item.amount) || 0,
-                        category: item.category || '🥦生鲜食材',
+                        category: item.category || '🍰零食甜品',
                         description: item.description || '小票商品',
                         aiComment: item.aiComment || '小票识别记录',
                         badge: item.badge || '小票达人',
@@ -664,7 +678,7 @@
                     });
                     count++;
                 }
-                alert(`🎉 成功识别小票！已按精细分类拆分记录了 ${count} 笔消费！`);
+                alert(`🎉 成功识别小票！已精准拆分记录了 ${count} 笔消费！`);
             } catch (err) {
                 alert('识别失败：' + err.message);
             } finally {
@@ -705,7 +719,7 @@
         document.getElementById('micBtn').classList.remove('recording');
     }
 
-    // ✏️ 文本记账 (注入精细分类系统 Prompt)
+    // ✏️ 文本记账 (注入超精准日常生活判定逻辑)
     async function addExpense() {
         const inputEl = document.getElementById('userInput');
         const text = inputEl.value.trim();
@@ -719,9 +733,26 @@
         const sendBtn = document.getElementById('sendBtn');
         sendBtn.disabled = true; sendBtn.innerText = '分析中...';
 
-        // 🌟 精细分类记账 Prompt 🌟
-        const systemPrompt = `分析用户的消费文本，提取金额和分类，并给出 80 字以内的特色点评和评价勋章。允许分类（必须且只能选其一）：🥦生鲜食材/🌾粮油调味/🛒超市零食/🧻日用百货/🏠厨具家电/☕咖啡奶茶/🍱正餐外卖/🍲约会大餐/👗服饰美妆/🚗交通出行/🎬电影娱乐/🐱宠物开销/其他。
-必须严格只返回 JSON 格式：{"amount": 数字, "category": "分类名称", "description": "简短名称", "aiComment": "点评", "badge": "勋章"}`;
+        // 🌟 深度优化的文本记账分类 Prompt 🌟
+        const systemPrompt = `分析用户的消费文本，提取金额和分类，并给出 80 字以内的特色点评和评价勋章。
+
+分类必须严格按照以下标准精确归类（严禁混淆）：
+- 🍰零食甜品：蛋糕、面包、烘焙糕点、甜点、坚果薯片、冰淇淋、零食熟食 (特别强调：蛋糕、面包类必须归为此类！)
+- ☕咖啡奶茶：咖啡、奶茶、果茶、饮品饮料、下午茶
+- 🍱正餐外卖：早餐、午餐、晚餐、快餐盒饭、正餐外卖 (强调：仅限正餐，不含蛋糕奶茶)
+- 🍲约会大餐：火锅、烧烤、情侣约会大餐、精致餐厅聚餐
+- 🥦生鲜食材：蔬菜、生鲜水果、生肉类、海鲜、蛋类买菜
+- 🌾粮油调味：米面、食用油、调味料、干货、冲调麦片
+- 🧻日用百货：纸巾、抽纸、洗洁精、洗衣液、清洁洗护用品
+- 🏠厨具家电：菜刀、锅具、碗筷餐具、厨房小家电
+- 👗服饰美妆：衣服、鞋包、护肤彩妆
+- 🚗交通出行：打车、滴滴、公交地铁、加油停车
+- 🎬电影娱乐：电影票、游戏氪金、演出、会员充值
+- 🐱宠物开销：猫粮、狗粮、宠物用品
+- 其他：杂项开销
+
+必须严格只返回 JSON 格式，不要 Markdown：
+{"amount": 数字, "category": "分类名称", "description": "简短名称", "aiComment": "点评", "badge": "勋章"}`;
 
         try {
             const response = await fetch(`${apiHost}/chat/completions`, {
