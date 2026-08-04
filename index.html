@@ -51,7 +51,6 @@
         .ai-box { background: #f8fafc; border-left: 3px solid #6366f1; padding: 6px 8px; border-radius: 4px; font-size: 12px; color: #334155; }
         .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
         .ai-badge { background: #e0e7ff; color: #4338ca; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
-        .btn-delete { color: #94a3b8; font-size: 11px; border: none; background: none; cursor: pointer; }
 
         /* 历史天数总结横幅卡片 */
         .day-banner { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 14px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s; }
@@ -66,7 +65,10 @@
         .detail-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; margin-bottom: 8px; }
         .btn-back { background: #f1f5f9; border: none; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: bold; color: #475569; cursor: pointer; }
 
-        .chart-box, .report-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; text-align: center; }
+        /* 饼图容器 */
+        .chart-box, .report-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; text-align: center; }
+        .chart-container-compact { position: relative; height: 180px; width: 100%; margin: 4px 0; }
+        
         .report-content { text-align: left; font-size: 13px; line-height: 1.6; color: #334155; white-space: pre-line; background: #f8fafc; padding: 12px; border-radius: 8px; margin-top: 10px; }
         .btn-action { background: #4f46e5; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 8px; }
 
@@ -77,13 +79,17 @@
         .input-area input[type="text"] { flex: 1; padding: 10px 12px; border: 1.5px solid #cbd5e1; border-radius: 10px; outline: none; font-size: 13px; }
         .input-area button.send { padding: 10px 16px; background: #4f46e5; color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; }
 
+        /* 🌟 修改账单弹窗 (Modal) 🌟 */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; display: none; justify-content: center; align-items: center; }
+        .modal-card { background: #fff; width: 90%; max-width: 360px; padding: 20px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
+
         @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
     </style>
 </head>
 <body>
 
 <div class="app-container">
-    <!-- 看板 -->
+    <!-- 顶部月度看板 -->
     <div class="dashboard">
         <div class="dash-row">
             <span class="dash-title">本月累计总支出</span>
@@ -99,7 +105,7 @@
         <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
         <div class="dash-row" style="font-size: 11px; opacity: 0.9;">
             <span id="budgetPercent">预算使用: 0%</span>
-            <span id="budgetRemain">剩余: ￥5000</span>
+            <span id="budgetRemain">剩余: ￥2500</span>
         </div>
     </div>
 
@@ -107,7 +113,7 @@
     <div class="main-tabs">
         <button class="tab-btn active" id="tab-btn-today" onclick="switchTab('today')">📝 今日实时</button>
         <button class="tab-btn" id="tab-btn-history" onclick="switchTab('history')">📅 历史账单</button>
-        <button class="tab-btn" onclick="switchTab('chart')">📊 分类饼图</button>
+        <button class="tab-btn" onclick="switchTab('chart')">📊 30天饼图</button>
         <button class="tab-btn" onclick="switchTab('report')">🏆 AI 颁奖</button>
     </div>
 
@@ -138,6 +144,15 @@
         <div id="todayTotalBanner" style="font-size: 12px; font-weight: bold; color: #475569; background: #f8fafc; padding: 6px 10px; border-radius: 8px;">
             今日消费小计：￥0.00
         </div>
+
+        <!-- 今日消费饼图 -->
+        <div id="todayChartBox" class="chart-box" style="display:none; margin-top:2px;">
+            <h4 style="font-size: 12px; color: #64748b; margin-bottom: 2px;">📊 今日消费分类占比</h4>
+            <div class="chart-container-compact">
+                <canvas id="todayCategoryChart"></canvas>
+            </div>
+        </div>
+
         <div id="todayFeedList">今日暂无消费记录~</div>
     </div>
 
@@ -146,20 +161,31 @@
         <div id="historyBannersList">加载历史天数中...</div>
     </div>
 
-    <!-- TAB 2.5: 某一天具体的详情界面 (点击横幅进入) -->
+    <!-- TAB 2.5: 某一天具体的详情界面 -->
     <div id="tab-day-detail" class="tab-content">
         <div class="detail-header">
             <button class="btn-back" onclick="switchTab('history')">← 返回历史列表</button>
             <span id="detailTitle" style="font-weight: bold; font-size: 14px; color: #1e293b;">消费明细</span>
         </div>
+
+        <!-- 当日消费饼图 -->
+        <div id="dayDetailChartBox" class="chart-box" style="display:none; margin-bottom:8px;">
+            <h4 style="font-size: 12px; color: #64748b; margin-bottom: 2px;">📊 当日消费分类占比</h4>
+            <div class="chart-container-compact">
+                <canvas id="dayDetailCategoryChart"></canvas>
+            </div>
+        </div>
+
         <div id="dayDetailFeedList"></div>
     </div>
 
-    <!-- TAB 3: 可视化饼图 -->
+    <!-- TAB 3: 近30天可视化饼图 -->
     <div id="tab-chart" class="tab-content">
         <div class="chart-box">
             <h3 style="font-size: 14px; margin-bottom: 10px;">近 30 天消费构成占比</h3>
-            <canvas id="categoryChart" width="300" height="300"></canvas>
+            <div style="position: relative; height:260px; width:100%;">
+                <canvas id="categoryChart"></canvas>
+            </div>
         </div>
     </div>
 
@@ -183,9 +209,43 @@
     </div>
 </div>
 
+<!-- 🌟 修改账单记录弹窗 (Modal) 🌟 -->
+<div class="modal-overlay" id="editModal">
+    <div class="modal-card">
+        <h3 style="font-size: 15px; color: #0f172a; margin-bottom: 12px;">✏️ 修改账单记录</h3>
+        <input type="hidden" id="editDocId">
+        <div style="display:flex; flex-direction:column; gap:10px; font-size:12px;">
+            <label style="color:#64748b;">账单名称：
+                <input type="text" id="editDesc" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; margin-top:4px;">
+            </label>
+            <label style="color:#64748b;">消费金额 (元)：
+                <input type="number" step="0.01" id="editAmount" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; margin-top:4px;">
+            </label>
+            <label style="color:#64748b;">消费分类：
+                <select id="editCategory" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; margin-top:4px;">
+                    <option value="☕咖啡奶茶">☕ 咖啡奶茶</option>
+                    <option value="🍱正餐外卖">🍱 正餐外卖</option>
+                    <option value="🍲约会大餐">🍲 约会大餐</option>
+                    <option value="👗服饰美妆">👗 服饰美妆</option>
+                    <option value="🚗交通出行">🚗 交通出行</option>
+                    <option value="🎬电影娱乐">🎬 电影娱乐</option>
+                    <option value="🏠日用家居">🏠 日用家居</option>
+                    <option value="🐱宠物开销">🐱 宠物开销</option>
+                    <option value="🛒超市零食">🛒 超市零食</option>
+                    <option value="其他">其他</option>
+                </select>
+            </label>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+            <button onclick="closeEditModal()" style="padding:8px 14px; border:1px solid #cbd5e1; background:#f1f5f9; border-radius:8px; font-size:12px; font-weight:bold; cursor:pointer; color:#475569;">取消</button>
+            <button onclick="saveEditExpense()" style="padding:8px 14px; border:none; background:#4f46e5; color:white; border-radius:8px; font-size:12px; font-weight:bold; cursor:pointer;">保存修改</button>
+        </div>
+    </div>
+</div>
+
 <script>
     // -------------------------------------------------------------
-    // 你的专属 Firebase 云数据库配置密钥
+    // Firebase 云数据库配置密钥
     // -------------------------------------------------------------
     const firebaseConfig = {
         apiKey: "AIzaSyAML602ml7-qlpsr6kvy8t7lTwZMbjEz74",
@@ -203,8 +263,13 @@
 
     let currentPersona = 'cat';
     let expenses = [];
-    let monthlyBudget = 5000;
-    let chartInstance = null;
+    let monthlyBudget = 2500;
+    
+    // 图表句柄
+    let monthlyChartInstance = null;
+    let todayChartInstance = null;
+    let dayDetailChartInstance = null;
+    
     let isRecording = false;
     let recognition = null;
     let selectedDetailDate = '';
@@ -224,13 +289,13 @@
         // 监听云端预算设置
         db.collection('settings').doc('budget').onSnapshot(doc => {
             if(doc.exists) {
-                monthlyBudget = doc.data().value || 5000;
+                monthlyBudget = doc.data().value || 2500;
                 document.getElementById('budgetInput').value = monthlyBudget;
                 updateDashboardTotal();
             }
         });
 
-        // 监听云端实时数据（只看半年内）
+        // 监听云端数据实时变动（半年内）
         const sixMonthsAgo = Date.now() - (180 * 24 * 60 * 60 * 1000);
         db.collection('expenses')
           .where('timestamp', '>=', sixMonthsAgo)
@@ -239,7 +304,7 @@
               snapshot.forEach(doc => { expenses.push({ id: doc.id, ...doc.data() }); });
               expenses.sort((a,b) => (a.timestamp || 0) - (b.timestamp || 0));
               
-              // 同步更新所有 UI 视图
+              // 数据变动后（新增/修改/删除），同步更新所有 UI 视图与图表
               renderTodayFeed();
               renderHistoryBanners();
               if(selectedDetailDate) renderDayDetail(selectedDetailDate);
@@ -248,7 +313,7 @@
     };
 
     function updateBudget() {
-        const val = Number(document.getElementById('budgetInput').value) || 5000;
+        const val = Number(document.getElementById('budgetInput').value) || 2500;
         db.collection('settings').doc('budget').set({ value: val });
     }
 
@@ -285,7 +350,44 @@
             document.getElementById(`tab-${tabName}`).classList.add('active');
         }
 
-        if(tabName === 'chart') renderChart();
+        if(tabName === 'chart') renderMonthlyChart();
+    }
+
+    // 渲染饼图工具函数
+    function renderPieChart(canvasId, items, existingChartInstance) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        const categoryTotals = {};
+        
+        items.forEach(item => {
+            const cat = item.category || '其他';
+            categoryTotals[cat] = (categoryTotals[cat] || 0) + Number(item.amount || 0);
+        });
+
+        const labels = Object.keys(categoryTotals);
+        const data = Object.values(categoryTotals);
+
+        if(existingChartInstance) existingChartInstance.destroy();
+
+        return new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#14b8a6', '#f43f5e']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { boxWidth: 10, font: { size: 10 } }
+                    }
+                }
+            }
+        });
     }
 
     // 1. 渲染【今日实时消费】
@@ -299,11 +401,14 @@
 
         if(todayItems.length === 0) {
             todayListEl.innerHTML = '<div style="text-align:center; color:#94a3b8; padding:30px 0; font-size:13px;">今天还没记账呢，去记一笔试试看吧！</div>';
+            document.getElementById('todayChartBox').style.display = 'none';
         } else {
             todayItems.forEach(item => {
                 todaySum += Number(item.amount || 0);
                 todayListEl.appendChild(createCardElement(item));
             });
+            document.getElementById('todayChartBox').style.display = 'block';
+            todayChartInstance = renderPieChart('todayCategoryChart', todayItems, todayChartInstance);
         }
 
         document.getElementById('todayTotalBanner').innerText = `今日消费小计：￥${todaySum.toFixed(2)}`;
@@ -348,7 +453,7 @@
         });
     }
 
-    // 3. 打开并渲染【单日详情界面】
+    // 3. 打开【单日详情界面】
     function openDayDetail(dateStr) {
         selectedDetailDate = dateStr;
         document.getElementById('detailTitle').innerText = `${dateStr} 消费明细`;
@@ -363,12 +468,20 @@
         detailListEl.innerHTML = '';
 
         const dayItems = expenses.filter(item => item.date === dateStr).reverse();
+        
+        if(dayItems.length > 0) {
+            document.getElementById('dayDetailChartBox').style.display = 'block';
+            dayDetailChartInstance = renderPieChart('dayDetailCategoryChart', dayItems, dayDetailChartInstance);
+        } else {
+            document.getElementById('dayDetailChartBox').style.display = 'none';
+        }
+
         dayItems.forEach(item => {
             detailListEl.appendChild(createCardElement(item));
         });
     }
 
-    // 生成账单卡片 DOM
+    // 生成包含【修改】和【删除】按钮的账单 DOM 卡片
     function createCardElement(item) {
         const card = document.createElement('div');
         card.className = 'card';
@@ -382,10 +495,57 @@
             <div class="ai-box"><strong>${item.personaName}：</strong>${item.aiComment}</div>
             <div class="card-footer">
                 <span class="ai-badge">${item.badge}</span>
-                <button class="btn-delete" onclick="deleteExpense('${item.id}')">删除</button>
+                <div>
+                    <button onclick="openEditModal('${item.id}')" style="color:#4f46e5; font-size:11px; border:none; background:none; cursor:pointer; margin-right:8px; font-weight:bold;">✏️ 修改</button>
+                    <button class="btn-delete" onclick="deleteExpense('${item.id}')">🗑️ 删除</button>
+                </div>
             </div>
         `;
         return card;
+    }
+
+    // 🌟 打开修改弹窗 🌟
+    function openEditModal(docId) {
+        const item = expenses.find(e => e.id === docId);
+        if (!item) return;
+        document.getElementById('editDocId').value = docId;
+        document.getElementById('editDesc').value = item.description || '';
+        document.getElementById('editAmount').value = item.amount || 0;
+        document.getElementById('editCategory').value = item.category || '其他';
+        document.getElementById('editModal').style.display = 'flex';
+    }
+
+    function closeEditModal() {
+        document.getElementById('editModal').style.display = 'none';
+    }
+
+    // 🌟 保存修改至云端数据库 🌟
+    async function saveEditExpense() {
+        const docId = document.getElementById('editDocId').value;
+        const newDesc = document.getElementById('editDesc').value.trim();
+        const newAmount = Number(document.getElementById('editAmount').value) || 0;
+        const newCategory = document.getElementById('editCategory').value;
+
+        if (!newDesc) return alert('请输入账单名称！');
+        if (newAmount <= 0) return alert('金额必须大于 0 元！');
+
+        try {
+            await db.collection('expenses').doc(docId).update({
+                description: newDesc,
+                amount: newAmount,
+                category: newCategory
+            });
+            closeEditModal();
+        } catch (err) {
+            alert('修改失败：' + err.message);
+        }
+    }
+
+    // 🌟 彻底删除账单 🌟
+    function deleteExpense(docId) {
+        if(confirm('确定要从云端删除这条记录吗？对方的手机上也会同步删除哦！')) {
+            db.collection('expenses').doc(docId).delete();
+        }
     }
 
     function updateDashboardTotal() {
@@ -399,37 +559,8 @@
         document.getElementById('budgetRemain').innerText = `剩余: ￥${(monthlyBudget - monthTotal).toFixed(2)}`;
     }
 
-    function deleteExpense(docId) {
-        if(confirm('确定要从云端删除这条记录吗？对方也会同步删除哦！')) {
-            db.collection('expenses').doc(docId).delete();
-        }
-    }
-
-    // 饼图渲染
-    function renderChart() {
-        const ctx = document.getElementById('categoryChart').getContext('2d');
-        const categoryTotals = {};
-        expenses.forEach(item => {
-            const cat = item.category || '其他';
-            categoryTotals[cat] = (categoryTotals[cat] || 0) + Number(item.amount || 0);
-        });
-
-        const labels = Object.keys(categoryTotals);
-        const data = Object.values(categoryTotals);
-
-        if(chartInstance) chartInstance.destroy();
-
-        chartInstance = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: labels.length ? labels : ['暂无数据'],
-                datasets: [{
-                    data: data.length ? data : [1],
-                    backgroundColor: ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#8b5cf6']
-                }]
-            },
-            options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
-        });
+    function renderMonthlyChart() {
+        monthlyChartInstance = renderPieChart('categoryChart', expenses, monthlyChartInstance);
     }
 
     // AI 月报总结
@@ -470,7 +601,7 @@
         }
     }
 
-    // 📷 拍照小票拆分识别
+    // 📷 拍照小票识别
     async function processReceiptImage(event) {
         const file = event.target.files[0];
         if (!file) return;
