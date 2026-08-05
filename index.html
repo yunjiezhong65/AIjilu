@@ -3,11 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>👩‍❤️‍👨 双人 AI 记账管家 (国内高速直连版)</title>
+    <title>👩‍❤️‍👨 双人 AI 记账管家 (国内免翻墙调通版)</title>
     <!-- Chart.js 图表库 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Supabase JS SDK v2 (国内 100% 极速畅通 饿了么 CDN) -->
-    <script src="https://npm.elemecdn.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+    
+    <!-- 🌟 多 CDN 容灾动态加载器 (彻底解决 Supabase SDK 在国内加载 404 / 卡死问题) 🌟 -->
+    <script>
+        window.isSupabaseReady = false;
+        (function loadSupabaseWithFallback() {
+            const cdns = [
+                'https://npm.elemecdn.com/@supabase/supabase-js@2/dist/umd/supabase.js',
+                'https://registry.npmmirror.com/@supabase/supabase-js/2.39.8/files/dist/umd/supabase.js',
+                'https://cdn.staticfile.net/supabase-js/2.39.8/supabase.js',
+                'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js'
+            ];
+            let index = 0;
+            function tryNextCDN() {
+                if (index >= cdns.length) {
+                    console.error("所有 Supabase CDN 节点加载失败！");
+                    const badge = document.getElementById('syncBadgeText');
+                    if (badge) badge.innerText = "🔴 数据库连接失败";
+                    return;
+                }
+                const script = document.createElement('script');
+                script.src = cdns[index];
+                script.onload = function() {
+                    console.log("Supabase SDK 成功从 CDN 加载：", cdns[index]);
+                    window.isSupabaseReady = true;
+                    if (window.onSupabaseInit) window.onSupabaseInit();
+                };
+                script.onerror = function() {
+                    console.warn("CDN 节点无法访问，尝试下一个：", cdns[index]);
+                    index++;
+                    tryNextCDN();
+                };
+                document.head.appendChild(script);
+            }
+            tryNextCDN();
+        })();
+    </script>
+
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f1f5f9; color: #1e293b; padding: 12px; display: flex; justify-content: center; }
@@ -92,7 +127,7 @@
     <div class="dashboard">
         <div class="dash-row">
             <span class="dash-title">本月累计总支出</span>
-            <div class="sync-badge"><div class="sync-dot"></div> 免翻墙秒级同步中</div>
+            <div class="sync-badge"><div class="sync-dot"></div> <span id="syncBadgeText">🟢 云端秒级同步中</span></div>
         </div>
         <div class="dash-row">
             <div class="dash-total" id="totalExpense">￥0.00</div>
@@ -152,7 +187,7 @@
             </div>
         </div>
 
-        <div id="todayFeedList">今日暂无消费记录~</div>
+        <div id="todayFeedList">数据加载中，请稍候...</div>
     </div>
 
     <!-- TAB 2: 历史天数总结列表 -->
@@ -254,11 +289,17 @@
 
     let supabase = null;
 
-    function initSupabase() {
+    function getSupabase() {
         if (supabase) return supabase;
         if (window.supabase && typeof window.supabase.createClient === 'function') {
-            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            return supabase;
+            try {
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                    auth: { persistSession: false }
+                });
+                return supabase;
+            } catch (err) {
+                console.error("Supabase 初始化出错：", err);
+            }
         }
         return null;
     }
@@ -282,24 +323,44 @@
         'deepseek-official': { host: 'https://api.deepseek.com/v1', model: 'deepseek-chat' }
     };
 
-    window.onload = function() {
-        initSupabase();
+    // 当 Supabase SDK 成功从 CDN 加载完毕时自动触发
+    window.onSupabaseInit = function() {
+        const client = getSupabase();
+        if (client) {
+            console.log("云数据库已就绪，开始拉取数据！");
+            document.getElementById('syncBadgeText').innerText = "🟢 云端秒级同步中";
+            loadBudget();
+            fetchExpenses();
+            subscribeRealtime();
+        }
+    };
 
+    window.onload = function() {
         document.getElementById('platformPreset').value = localStorage.getItem('platform_preset') || 'zhipu-free';
         document.getElementById('apiKey').value = localStorage.getItem('api_key') || '';
         applyPreset();
         initSpeechRecognition();
 
-        // 加载云端数据
-        loadBudget();
-        fetchExpenses();
-        subscribeRealtime();
+        // 尝试立即初始化
+        if (window.isSupabaseReady) {
+            window.onSupabaseInit();
+        }
+
+        // 🌟 核心防干预兜底：针对国内移动网络 4G/5G 容易丢 WebSocket 的问题，增加每 5 秒轮询 + 获得焦点自动刷新 🌟
+        setInterval(() => {
+            if (getSupabase()) fetchExpenses(true);
+        }, 5000);
+
+        window.addEventListener('focus', () => {
+            if (getSupabase()) fetchExpenses(true);
+        });
     };
 
     function applyPreset() {
         const selected = document.getElementById('platformPreset').value;
         const config = presets[selected] || presets['zhipu-free'];
         
+        // 强行把完整 URL 填入 input 框，防止发送给本地相对路径
         document.getElementById('apiHost').value = config.host;
         document.getElementById('modelName').value = config.model;
         localStorage.setItem('platform_preset', selected);
@@ -311,65 +372,78 @@
     }
 
     async function loadBudget() {
-        const client = initSupabase();
+        const client = getSupabase();
         if (!client) return;
-        const { data } = await client.from('settings').select('*').eq('id', 'budget').single();
-        if (data) {
-            monthlyBudget = Number(data.value) || 5000;
-            document.getElementById('budgetInput').value = monthlyBudget;
-            updateDashboardTotal();
-        }
+        try {
+            const { data } = await client.from('settings').select('*').eq('id', 'budget').single();
+            if (data) {
+                monthlyBudget = Number(data.value) || 5000;
+                document.getElementById('budgetInput').value = monthlyBudget;
+                updateDashboardTotal();
+            }
+        } catch (e) { console.warn("获取预算失败：", e); }
     }
 
-    async function fetchExpenses() {
-        const client = initSupabase();
-        if (!client) return;
-        
+    async function fetchExpenses(isSilent = false) {
+        const client = getSupabase();
+        if (!client) {
+            if (!isSilent) document.getElementById('todayFeedList').innerHTML = '<div style="text-align:center; color:#ef4444; padding:20px 0; font-size:12px;">⚠️ 正在连接云数据库，请稍等...</div>';
+            return;
+        }
+
         const sixMonthsAgo = Date.now() - (180 * 24 * 60 * 60 * 1000);
-        const { data, error } = await client
-            .from('expenses')
-            .select('*')
-            .gte('timestamp', sixMonthsAgo)
-            .order('timestamp', { ascending: true });
+        try {
+            const { data, error } = await client
+                .from('expenses')
+                .select('*')
+                .gte('timestamp', sixMonthsAgo)
+                .order('timestamp', { ascending: true });
 
-        if (!error && data) {
-            expenses = data.map(item => ({
-                id: item.id,
-                amount: item.amount,
-                category: item.category,
-                description: item.description,
-                aiComment: item.ai_comment,
-                badge: item.badge,
-                personaName: item.persona_name,
-                date: item.date,
-                time: item.time,
-                timestamp: item.timestamp
-            }));
+            if (!error && data) {
+                expenses = data.map(item => ({
+                    id: item.id,
+                    amount: item.amount,
+                    category: item.category,
+                    description: item.description,
+                    aiComment: item.ai_comment,
+                    badge: item.badge,
+                    personaName: item.persona_name,
+                    date: item.date,
+                    time: item.time,
+                    timestamp: item.timestamp
+                }));
 
-            renderTodayFeed();
-            renderHistoryBanners();
-            if(selectedDetailDate) renderDayDetail(selectedDetailDate);
-            updateDashboardTotal();
+                renderTodayFeed();
+                renderHistoryBanners();
+                if(selectedDetailDate) renderDayDetail(selectedDetailDate);
+                updateDashboardTotal();
+            } else if (error && !isSilent) {
+                console.error("数据库查询报错：", error);
+            }
+        } catch(err) {
+            console.warn("网络拉取异常：", err);
         }
     }
 
     function subscribeRealtime() {
-        const client = initSupabase();
+        const client = getSupabase();
         if (!client) return;
-        client
-            .channel('public:expenses')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, payload => {
-                fetchExpenses();
-            })
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, payload => {
-                loadBudget();
-            })
-            .subscribe();
+        try {
+            client
+                .channel('public:expenses')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, payload => {
+                    fetchExpenses(true);
+                })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, payload => {
+                    loadBudget();
+                })
+                .subscribe();
+        } catch(e) { console.warn("Realtime 订阅异常：", e); }
     }
 
     async function updateBudget() {
         const val = Number(document.getElementById('budgetInput').value) || 5000;
-        const client = initSupabase();
+        const client = getSupabase();
         if (client) {
             await client.from('settings').upsert({ id: 'budget', value: val });
         }
@@ -571,7 +645,7 @@
         if (!newDesc) return alert('请输入账单名称！');
         if (newAmount <= 0) return alert('金额必须大于 0 元！');
 
-        const client = initSupabase();
+        const client = getSupabase();
         if (!client) return alert('云数据库未连接成功，请刷新网页后再试！');
 
         try {
@@ -581,17 +655,19 @@
                 category: newCategory
             }).eq('id', docId);
             closeEditModal();
+            fetchExpenses(true);
         } catch (err) {
             alert('修改失败：' + err.message);
         }
     }
 
     async function deleteExpense(docId) {
-        const client = initSupabase();
+        const client = getSupabase();
         if (!client) return alert('云数据库未连接成功，请刷新网页后再试！');
 
         if(confirm('确定要从云端删除这条记录吗？对方的手机上也会同步删除哦！')) {
             await client.from('expenses').delete().eq('id', docId);
+            fetchExpenses(true);
         }
     }
 
@@ -649,7 +725,7 @@
 
     // 📷 拍照小票识别
     async function processReceiptImage(event) {
-        const client = initSupabase();
+        const client = getSupabase();
         if (!client) return alert('云数据库未连接成功，请刷新网页重试！');
 
         const file = event.target.files[0];
@@ -723,6 +799,7 @@
                     count++;
                 }
                 alert(`🎉 成功识别小票！已精准拆分记录了 ${count} 笔消费！`);
+                fetchExpenses(true);
             } catch (err) {
                 alert('识别失败：' + err.message);
             } finally {
@@ -764,8 +841,8 @@
 
     // ✏️ 文本记账
     async function addExpense() {
-        const client = initSupabase();
-        if (!client) return alert('云数据库未连接成功，请刷新网页后再试！');
+        const client = getSupabase();
+        if (!client) return alert('云数据库正在初始化中，请等 2 秒后再试！');
 
         const inputEl = document.getElementById('userInput');
         const text = inputEl.value.trim();
@@ -808,11 +885,14 @@
             });
 
             const data = await response.json();
+            if (!data.choices || !data.choices[0]) {
+                throw new Error("AI 接口未返回数据，请检查 API Key！");
+            }
             const res = JSON.parse(data.choices[0].message.content.match(/\{[\s\S]*\}/)[0]);
             const personaNames = { cat: '🐱 毒舌猫', angel: '👼 夸夸天使', abacus: '🧮 算盘娘', cyber: '🤖 赛博理财' };
             const now = new Date();
 
-            await client.from('expenses').insert([{
+            const { error: insertError } = await client.from('expenses').insert([{
                 amount: res.amount || 0,
                 category: res.category || '其他',
                 description: res.description || text,
@@ -824,7 +904,12 @@
                 timestamp: Date.now()
             }]);
 
-            inputEl.value = '';
+            if (insertError) {
+                alert("写入数据库失败：" + insertError.message);
+            } else {
+                inputEl.value = '';
+                fetchExpenses(true);
+            }
         } catch (err) {
             alert('记账失败：' + err.message);
         } finally {
