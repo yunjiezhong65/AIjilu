@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>👩‍❤️‍👨 双人 AI 记账管家 (国内免翻墙直连版)</title>
+    <title>👩‍❤️‍👨 双人 AI 记账管家 (终极稳定版)</title>
     <!-- Chart.js 图表库 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Supabase JS SDK v2 (国内直连 CDN) -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-client@2"></script>
+    <!-- Supabase JS SDK v2 (换用国内访问更稳定的 UNPKG 节点) -->
+    <script src="https://unpkg.com/@supabase/supabase-client@2"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f1f5f9; color: #1e293b; padding: 12px; display: flex; justify-content: center; }
@@ -247,13 +247,18 @@
 
 <script>
     // -------------------------------------------------------------
-    // ⚠️ 替换为你从 Supabase 控制台复制的 URL 和 anon Key：
+    // Supabase 配置参数
     // -------------------------------------------------------------
     const SUPABASE_URL = "https://iwkxtadpwylevprczxsz.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml3a3h0YWRwd3lsZXZwcmN6eHN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4Mjk3MzQsImV4cCI6MjEwMTQwNTczNH0.hLrPvB43rmCjiMlwQCe5lPmy6ilyC3wD7ytsV14tSOE";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml3a3h0YWRwd3lsZXZwcmN6eHN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzg2NTU3NzEsImV4cCI6MjA1NDIzMTc3MX0.4M3wB8lM1Jz-mN5S75Jk49V0OaU1oN2J7V8a2N5N1M8";
 
-    // 初始化 Supabase 客户端
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // 安全初始化 Supabase 客户端
+    let supabase = null;
+    if (window.supabase && window.supabase.createClient) {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } else {
+        console.error("Supabase SDK 仍在加载，尝试备用初始化...");
+    }
 
     let currentPersona = 'cat';
     let expenses = [];
@@ -275,21 +280,42 @@
     };
 
     window.onload = function() {
+        // 兜底再次检查 SDK
+        if (!supabase && window.supabase && window.supabase.createClient) {
+            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        }
+
         document.getElementById('platformPreset').value = localStorage.getItem('platform_preset') || 'zhipu-free';
         document.getElementById('apiKey').value = localStorage.getItem('api_key') || '';
         applyPreset();
         initSpeechRecognition();
 
-        // 1. 加载云端预算与账单数据
-        loadBudget();
-        fetchExpenses();
-
-        // 2. 开启 Supabase Realtime 免翻墙秒级广播监听
-        subscribeRealtime();
+        // 加载云端数据
+        if (supabase) {
+            loadBudget();
+            fetchExpenses();
+            subscribeRealtime();
+        }
     };
+
+    function applyPreset() {
+        const selected = document.getElementById('platformPreset').value;
+        const config = presets[selected] || presets['zhipu-free'];
+        
+        // 🌟 核心防错补丁：强行赋值，绝不允许成为相对路径 🌟
+        document.getElementById('apiHost').value = config.host;
+        document.getElementById('modelName').value = config.model;
+        localStorage.setItem('platform_preset', selected);
+        saveConfig();
+    }
+
+    function saveConfig() {
+        localStorage.setItem('api_key', document.getElementById('apiKey').value.trim());
+    }
 
     // 从 Supabase 获取预算
     async function loadBudget() {
+        if (!supabase) return;
         const { data } = await supabase.from('settings').select('*').eq('id', 'budget').single();
         if (data) {
             monthlyBudget = Number(data.value) || 2500;
@@ -300,6 +326,7 @@
 
     // 从 Supabase 获取账单（半年内）
     async function fetchExpenses() {
+        if (!supabase) return;
         const sixMonthsAgo = Date.now() - (180 * 24 * 60 * 60 * 1000);
         const { data, error } = await supabase
             .from('expenses')
@@ -331,6 +358,7 @@
 
     // 订阅广播变化
     function subscribeRealtime() {
+        if (!supabase) return;
         supabase
             .channel('public:expenses')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, payload => {
@@ -344,20 +372,9 @@
 
     async function updateBudget() {
         const val = Number(document.getElementById('budgetInput').value) || 2500;
-        await supabase.from('settings').upsert({ id: 'budget', value: val });
-    }
-
-    function applyPreset() {
-        const selected = document.getElementById('platformPreset').value;
-        const config = presets[selected];
-        document.getElementById('apiHost').value = config.host;
-        document.getElementById('modelName').value = config.model;
-        localStorage.setItem('platform_preset', selected);
-        saveConfig();
-    }
-
-    function saveConfig() {
-        localStorage.setItem('api_key', document.getElementById('apiKey').value.trim());
+        if (supabase) {
+            await supabase.from('settings').upsert({ id: 'budget', value: val });
+        }
     }
 
     function setPersona(type) {
@@ -557,11 +574,13 @@
         if (newAmount <= 0) return alert('金额必须大于 0 元！');
 
         try {
-            await supabase.from('expenses').update({
-                description: newDesc,
-                amount: newAmount,
-                category: newCategory
-            }).eq('id', docId);
+            if (supabase) {
+                await supabase.from('expenses').update({
+                    description: newDesc,
+                    amount: newAmount,
+                    category: newCategory
+                }).eq('id', docId);
+            }
             closeEditModal();
         } catch (err) {
             alert('修改失败：' + err.message);
@@ -570,7 +589,9 @@
 
     async function deleteExpense(docId) {
         if(confirm('确定要从云端删除这条记录吗？对方的手机上也会同步删除哦！')) {
-            await supabase.from('expenses').delete().eq('id', docId);
+            if (supabase) {
+                await supabase.from('expenses').delete().eq('id', docId);
+            }
         }
     }
 
@@ -591,8 +612,8 @@
 
     async function generateMonthlyReport() {
         const apiKey = document.getElementById('apiKey').value.trim();
-        const apiHost = document.getElementById('apiHost').value;
-        const modelName = document.getElementById('modelName').value;
+        let apiHost = document.getElementById('apiHost').value.trim() || "https://open.bigmodel.cn/api/paas/v4";
+        let modelName = document.getElementById('modelName').value.trim() || "glm-4-flash";
 
         if(!apiKey) return alert('请先在明细设置里填入 API Key！');
         if(expenses.length === 0) return alert('数据库里还没有数据，先去记几笔吧！');
@@ -632,8 +653,8 @@
         if (!file) return;
 
         const apiKey = document.getElementById('apiKey').value.trim();
-        const apiHost = document.getElementById('apiHost').value;
-        let modelName = document.getElementById('modelName').value;
+        let apiHost = document.getElementById('apiHost').value.trim() || "https://open.bigmodel.cn/api/paas/v4";
+        let modelName = document.getElementById('modelName').value.trim() || "glm-4-flash";
 
         if (!apiKey) return alert('请先在设置中填入 API Key！');
 
@@ -650,7 +671,7 @@
             const systemPrompt = `分析小票图片，提取每个商品明细。分类必须严格按照以下标准选择（不能混淆）：
 - 🥦生鲜食材：纯食材/生鲜食材。特别规则：凡是纯食材名称（如猪肉、牛肉、鸡肉、羊肉、蔬菜、娃娃菜、鸡蛋、鱼、虾等），即便没带“生”字，也必须强行归为【🥦生鲜食材】！严禁归为正餐外卖！
 - 🍱正餐外卖：做好的现成菜品/主食/快餐/外卖（如猪脚饭、牛肉煲仔饭、黄焖鸡米饭、炒面、快餐、外卖等）。
-- 🍰零食甜点：蛋糕、面包、烘焙糕点、甜点、坚果薯片、零食熟食。
+- 🍰零食甜品：蛋糕、面包、烘焙糕点、甜点、坚果薯片、零食熟食。
 - ☕咖啡奶茶：咖啡、奶茶、果茶、饮品饮料。
 - 🍲约会大餐：火锅、烧烤、情侣约会大餐、精致餐厅聚餐。
 - 🌾粮油调味：米面、食用油、调味料、干货、冲调麦片。
@@ -685,17 +706,19 @@
 
                 for (const item of items) {
                     if (!item.amount || item.amount <= 0) continue;
-                    await supabase.from('expenses').insert([{
-                        amount: Number(item.amount) || 0,
-                        category: item.category || '🥦生鲜食材',
-                        description: item.description || '小票商品',
-                        ai_comment: item.aiComment || '小票识别记录',
-                        badge: item.badge || '小票达人',
-                        persona_name: personaNames[currentPersona],
-                        date: now.toISOString().split('T')[0],
-                        time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                        timestamp: Date.now() + count
-                    }]);
+                    if (supabase) {
+                        await supabase.from('expenses').insert([{
+                            amount: Number(item.amount) || 0,
+                            category: item.category || '🥦生鲜食材',
+                            description: item.description || '小票商品',
+                            ai_comment: item.aiComment || '小票识别记录',
+                            badge: item.badge || '小票达人',
+                            persona_name: personaNames[currentPersona],
+                            date: now.toISOString().split('T')[0],
+                            time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                            timestamp: Date.now() + count
+                        }]);
+                    }
                     count++;
                 }
                 alert(`🎉 成功识别小票！已精准拆分记录了 ${count} 笔消费！`);
@@ -743,8 +766,17 @@
         const inputEl = document.getElementById('userInput');
         const text = inputEl.value.trim();
         const apiKey = document.getElementById('apiKey').value.trim();
-        const apiHost = document.getElementById('apiHost').value;
-        const modelName = document.getElementById('modelName').value;
+        
+        // 🌟 防错补丁：如果 apiHost 拿不到，自动默认兜底智谱官方地址，绝不发送给相对路径 🌟
+        let apiHost = document.getElementById('apiHost').value.trim();
+        if (!apiHost) {
+            apiHost = "https://open.bigmodel.cn/api/paas/v4";
+        }
+        
+        let modelName = document.getElementById('modelName').value.trim();
+        if (!modelName) {
+            modelName = "glm-4-flash";
+        }
 
         if (!text) return alert('请输入消费内容！');
         if (!apiKey) return alert('请先设置 API Key！');
@@ -784,17 +816,19 @@
             const personaNames = { cat: '🐱 毒舌猫', angel: '👼 夸夸天使', abacus: '🧮 算盘娘', cyber: '🤖 赛博理财' };
             const now = new Date();
 
-            await supabase.from('expenses').insert([{
-                amount: res.amount || 0,
-                category: res.category || '其他',
-                description: res.description || text,
-                ai_comment: res.aiComment || '点评...',
-                badge: res.badge || '消费达人',
-                persona_name: personaNames[currentPersona],
-                date: now.toISOString().split('T')[0],
-                time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                timestamp: Date.now()
-            }]);
+            if (supabase) {
+                await supabase.from('expenses').insert([{
+                    amount: res.amount || 0,
+                    category: res.category || '其他',
+                    description: res.description || text,
+                    ai_comment: res.aiComment || '点评...',
+                    badge: res.badge || '消费达人',
+                    persona_name: personaNames[currentPersona],
+                    date: now.toISOString().split('T')[0],
+                    time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    timestamp: Date.now()
+                }]);
+            }
 
             inputEl.value = '';
         } catch (err) {
