@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>👩‍❤️‍👨 双人 AI 记账管家 (高速直连版)</title>
+    <title>👩‍❤️‍👨 双人 AI 记账管家 (终极稳定版)</title>
     <!-- Chart.js 图表库 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Supabase JS SDK (国内高速 CDN + 自动灾备切换) -->
-    <script src="https://cdn.bootcdn.net/ajax/libs/supabase-js/2.39.8/supabase.min.js" onerror="this.onerror=null;this.src='https://npm.elemecdn.com/@supabase/supabase-client@2/dist/umd/supabase.js';"></script>
+    <!-- Supabase JS SDK (国内阿里/饿了么高速 CDN，保证不 404) -->
+    <script src="https://npm.elemecdn.com/@supabase/supabase-client@2" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-client@2';"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f1f5f9; color: #1e293b; padding: 12px; display: flex; justify-content: center; }
@@ -254,7 +254,6 @@
 
     let supabase = null;
 
-    // 安全初始化客户端函数
     function initSupabase() {
         if (supabase) return supabase;
         if (window.supabase && typeof window.supabase.createClient === 'function') {
