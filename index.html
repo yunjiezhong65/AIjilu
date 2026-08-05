@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>👩‍❤️‍👨 双人 AI 记账管家 (标准稳定版)</title>
+    <title>👩‍❤️‍👨 双人 AI 记账管家 (完美版)</title>
     <!-- Chart.js 图表库 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
@@ -131,13 +131,13 @@
             <div class="dash-total" id="totalExpense">￥0.00</div>
             <div>
                 <span class="dash-title">月预算 ￥</span>
-                <input type="number" id="budgetInput" class="budget-input-inline" value="5000" onchange="updateBudget()">
+                <input type="number" id="budgetInput" class="budget-input-inline" value="2500" onchange="updateBudget()">
             </div>
         </div>
         <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
         <div class="dash-row" style="font-size: 11px; opacity: 0.9;">
             <span id="budgetPercent">预算使用: 0%</span>
-            <span id="budgetRemain">剩余: ￥5000</span>
+            <span id="budgetRemain">剩余: ￥2500</span>
         </div>
     </div>
 
@@ -280,7 +280,7 @@
 
 <script>
     // -------------------------------------------------------------
-    // ⚠️ 替换为你在 Supabase 新项目复制的绝对准确的 URL 和 anon Key：
+    // Supabase 配置参数
     // -------------------------------------------------------------
     const SUPABASE_URL = "https://iwkxtadpwylevprczxsz.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml3a3h0YWRwd3lsZXZwcmN6eHN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4Mjk3MzQsImV4cCI6MjEwMTQwNTczNH0.hLrPvB43rmCjiMlwQCe5lPmy6ilyC3wD7ytsV14tSOE";
@@ -304,7 +304,7 @@
 
     let currentPersona = 'cat';
     let expenses = [];
-    let monthlyBudget = 5000;
+    let monthlyBudget = 2500;
     
     // 图表句柄
     let monthlyChartInstance = null;
@@ -345,10 +345,10 @@
             window.onSupabaseInit();
         }
 
-        // 定时轮询与获得焦点刷新
+        // 5秒轮询静默刷新
         setInterval(() => {
             if (getSupabaseClient()) fetchExpenses(true);
-        }, 5000);
+        }, 2500);
 
         window.addEventListener('focus', () => {
             if (getSupabaseClient()) fetchExpenses(true);
@@ -373,9 +373,10 @@
         const client = getSupabaseClient();
         if (!client) return;
         try {
-            const { data } = await client.from('settings').select('*').eq('id', 'budget').single();
+            // 🌟 修复 406 报错：改用 maybeSingle()，查不到数据时静默返回 null 🌟
+            const { data } = await client.from('settings').select('*').eq('id', 'budget').maybeSingle();
             if (data) {
-                monthlyBudget = Number(data.value) || 5000;
+                monthlyBudget = Number(data.value) || 2500;
                 document.getElementById('budgetInput').value = monthlyBudget;
                 updateDashboardTotal();
             }
@@ -440,7 +441,7 @@
     }
 
     async function updateBudget() {
-        const val = Number(document.getElementById('budgetInput').value) || 5000;
+        const val = Number(document.getElementById('budgetInput').value) || 2500;
         const client = getSupabaseClient();
         if (client) {
             await client.from('settings').upsert({ id: 'budget', value: val });
@@ -500,6 +501,8 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                // 🌟 禁用重新渲染时的旋转过度动画，防止 5 秒定时同步时饼图闪烁 🌟
+                animation: false,
                 plugins: {
                     legend: {
                         position: 'bottom',
