@@ -281,7 +281,929 @@
 </div>
 
 <script>
+    // -------------------------------------------------------------<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>👩‍❤️‍👨 双人 AI 记账管家 (国内免翻墙调通版)</title>
+    <!-- Chart.js 图表库 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- 🌟 多 CDN 容灾动态加载器 (彻底解决 Supabase SDK 加载问题) 🌟 -->
+    <script>
+        window.isSupabaseReady = false;
+        (function loadSupabaseWithFallback() {
+            const cdns = [
+                'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js',
+                'https://npm.elemecdn.com/@supabase/supabase-js@2/dist/umd/supabase.js',
+                'https://registry.npmmirror.com/@supabase/supabase-js/2.39.8/files/dist/umd/supabase.js',
+                'https://cdn.staticfile.net/supabase-js/2.39.8/supabase.js'
+            ];
+            let index = 0;
+            function tryNextCDN() {
+                if (index >= cdns.length) {
+                    console.error("所有 Supabase CDN 节点加载失败！");
+                    const badge = document.getElementById('syncBadgeText');
+                    if (badge) badge.innerText = "🔴 数据库连接失败";
+                    return;
+                }
+                const script = document.createElement('script');
+                script.src = cdns[index];
+                script.onload = function() {
+                    console.log("Supabase SDK 成功从 CDN 加载：", cdns[index]);
+                    window.isSupabaseReady = true;
+                    if (window.onSupabaseInit) window.onSupabaseInit();
+                };
+                script.onerror = function() {
+                    console.warn("CDN 节点无法访问，尝试下一个：", cdns[index]);
+                    index++;
+                    tryNextCDN();
+                };
+                document.head.appendChild(script);
+            }
+            tryNextCDN();
+        })();
+    </script>
+
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f1f5f9; color: #1e293b; padding: 12px; display: flex; justify-content: center; }
+        .app-container { width: 100%; max-width: 480px; background: #fff; border-radius: 20px; box-shadow: 0 8px 30px rgba(0,0,0,0.08); padding: 16px; min-height: 94vh; display: flex; flex-direction: column; position: relative; }
+        
+        /* 顶部看板 */
+        .dashboard { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; padding: 16px; border-radius: 16px; margin-bottom: 12px; }
+        .dash-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+        .dash-title { font-size: 12px; opacity: 0.9; }
+        .dash-total { font-size: 26px; font-weight: bold; }
+        .progress-bar-bg { background: rgba(255,255,255,0.25); height: 8px; border-radius: 4px; overflow: hidden; margin: 8px 0; }
+        .progress-bar-fill { background: #34d399; height: 100%; width: 0%; transition: width 0.3s; }
+        .budget-input-inline { background: rgba(255,255,255,0.2); border: none; color: white; width: 70px; text-align: right; padding: 2px 4px; border-radius: 4px; font-weight: bold; }
+
+        .sync-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 10px; }
+        .sync-dot { width: 6px; height: 6px; background: #34d399; border-radius: 50%; }
+
+        /* 顶部 Tab 导航 */
+        .main-tabs { display: flex; border-bottom: 2px solid #f1f5f9; margin-bottom: 12px; }
+        .tab-btn { flex: 1; padding: 10px 0; border: none; background: none; font-size: 13px; font-weight: bold; color: #64748b; cursor: pointer; text-align: center; }
+        .tab-btn.active { color: #4f46e5; border-bottom: 2px solid #4f46e5; margin-bottom: -2px; }
+
+        .tab-content { display: none; flex: 1; overflow-y: auto; flex-direction: column; gap: 10px; }
+        .tab-content.active { display: flex; }
+
+        details.config-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 10px; font-size: 12px; margin-bottom: 8px; }
+        details summary { font-weight: bold; cursor: pointer; color: #475569; }
+        .config-group { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+        .config-group input, .config-group select { padding: 6px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; }
+
+        .persona-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+        .persona-btn { padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: white; cursor: pointer; text-align: center; font-size: 12px; font-weight: 500; }
+        .persona-btn.active { border-color: #4f46e5; background: #eef2ff; color: #4f46e5; font-weight: bold; }
+
+        /* 账单卡片 */
+        .card { background: #fff; border: 1px solid #f1f5f9; box-shadow: 0 2px 6px rgba(0,0,0,0.02); border-radius: 12px; padding: 12px; }
+        .card-header { display: flex; justify-content: space-between; font-weight: bold; font-size: 14px; }
+        .card-amount { color: #ef4444; }
+        .card-sub { font-size: 11px; color: #94a3b8; margin: 4px 0 6px 0; }
+        .ai-box { background: #f8fafc; border-left: 3px solid #6366f1; padding: 6px 8px; border-radius: 4px; font-size: 12px; color: #334155; }
+        .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
+        .ai-badge { background: #e0e7ff; color: #4338ca; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: bold; }
+
+        /* 历史天数总结横幅 */
+        .day-banner { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 14px; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s; }
+        .day-banner:hover { border-color: #6366f1; background: #f8fafc; transform: translateY(-1px); }
+        .day-banner-date { font-weight: bold; font-size: 15px; color: #0f172a; }
+        .day-banner-count { font-size: 11px; color: #64748b; margin-top: 2px; }
+        .day-banner-right { text-align: right; }
+        .day-banner-total { font-size: 16px; font-weight: bold; color: #ef4444; }
+        .day-banner-arrow { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+
+        /* 单日详情页顶栏 */
+        .detail-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0; margin-bottom: 8px; }
+        .btn-back { background: #f1f5f9; border: none; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: bold; color: #475569; cursor: pointer; }
+
+        /* 饼图容器 */
+        .chart-box, .report-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; text-align: center; }
+        .chart-container-compact { position: relative; height: 180px; width: 100%; margin: 4px 0; }
+        
+        .report-content { text-align: left; font-size: 13px; line-height: 1.6; color: #334155; white-space: pre-line; background: #f8fafc; padding: 12px; border-radius: 8px; margin-top: 10px; }
+        .btn-action { background: #4f46e5; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; margin-top: 8px; }
+
+        /* 底部固定输入栏 */
+        .input-area { display: flex; gap: 6px; margin-top: auto; padding-top: 10px; border-top: 1px solid #f1f5f9; align-items: center; }
+        .btn-icon { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px; cursor: pointer; font-size: 16px; }
+        .btn-icon.recording { background: #fee2e2; border-color: #ef4444; animation: pulse 1s infinite; }
+        .input-area input[type="text"] { flex: 1; padding: 10px 12px; border: 1.5px solid #cbd5e1; border-radius: 10px; outline: none; font-size: 13px; }
+        .input-area button.send { padding: 10px 16px; background: #4f46e5; color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; }
+
+        /* 修改账单弹窗 */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999; display: none; justify-content: center; align-items: center; }
+        .modal-card { background: #fff; width: 90%; max-width: 360px; padding: 20px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
+
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <!-- 顶部月度看板 -->
+    <div class="dashboard">
+        <div class="dash-row">
+            <span class="dash-title">本月累计总支出</span>
+            <div class="sync-badge"><div class="sync-dot"></div> <span id="syncBadgeText">🟢 云端秒级同步中</span></div>
+        </div>
+        <div class="dash-row">
+            <div class="dash-total" id="totalExpense">￥0.00</div>
+            <div>
+                <span class="dash-title">月预算 ￥</span>
+                <input type="number" id="budgetInput" class="budget-input-inline" value="2500" onchange="updateBudget()">
+            </div>
+        </div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
+        <div class="dash-row" style="font-size: 11px; opacity: 0.9;">
+            <span id="budgetPercent">预算使用: 0%</span>
+            <span id="budgetRemain">剩余: ￥2500</span>
+        </div>
+    </div>
+
+    <!-- 顶部 Tab 导航 -->
+    <div class="main-tabs">
+        <button class="tab-btn active" id="tab-btn-today" onclick="switchTab('today')">📝 今日实时</button>
+        <button class="tab-btn" id="tab-btn-history" onclick="switchTab('history')">📅 历史账单</button>
+        <button class="tab-btn" onclick="switchTab('chart')">📊 30天饼图</button>
+        <button class="tab-btn" onclick="switchTab('report')">🏆 AI 颁奖</button>
+    </div>
+
+    <!-- TAB 1: 今日实时消费 -->
+    <div id="tab-today" class="tab-content active">
+        <details class="config-box">
+            <summary>⚙️ API 平台与人设设置</summary>
+            <div class="config-group">
+                <label>选择 AI 平台：</label>
+                <select id="platformPreset" onchange="applyPreset()">
+                    <option value="zhipu-free">【免费推荐】智谱 GLM-4-Flash (全能免费)</option>
+                    <option value="siliconflow-free">硅基流动 - Qwen2.5 (免费)</option>
+                    <option value="deepseek-official">DeepSeek 官方 API</option>
+                </select>
+                <label>API Key：</label>
+                <input type="password" id="apiKey" placeholder="粘贴 API Key" onchange="saveConfig()">
+                <input type="hidden" id="apiHost"><input type="hidden" id="modelName">
+            </div>
+        </details>
+
+        <div class="persona-grid">
+            <button class="persona-btn active" id="btn-cat" onclick="setPersona('cat')">🐱 毒舌黑猫</button>
+            <button class="persona-btn" id="btn-angel" onclick="setPersona('angel')">👼 夸夸天使</button>
+            <button class="persona-btn" id="btn-abacus" onclick="setPersona('abacus')">🧮 算盘娘</button>
+            <button class="persona-btn" id="btn-cyber" onclick="setPersona('cyber')">🤖 赛博理财</button>
+        </div>
+
+        <div id="todayTotalBanner" style="font-size: 12px; font-weight: bold; color: #475569; background: #f8fafc; padding: 6px 10px; border-radius: 8px;">
+            今日消费小计：￥0.00
+        </div>
+
+        <!-- 今日消费饼图 -->
+        <div id="todayChartBox" class="chart-box" style="display:none; margin-top:2px;">
+            <h4 style="font-size: 12px; color: #64748b; margin-bottom: 2px;">📊 今日消费分类占比</h4>
+            <div class="chart-container-compact">
+                <canvas id="todayCategoryChart"></canvas>
+            </div>
+        </div>
+
+        <div id="todayFeedList">数据加载中，请稍候...</div>
+    </div>
+
+    <!-- TAB 2: 历史天数总结列表 -->
+    <div id="tab-history" class="tab-content">
+        <div id="historyBannersList">加载历史天数中...</div>
+    </div>
+
+    <!-- TAB 2.5: 某一天具体的详情界面 -->
+    <div id="tab-day-detail" class="tab-content">
+        <div class="detail-header">
+            <button class="btn-back" onclick="switchTab('history')">← 返回历史列表</button>
+            <span id="detailTitle" style="font-weight: bold; font-size: 14px; color: #1e293b;">消费明细</span>
+        </div>
+
+        <!-- 当日消费饼图 -->
+        <div id="dayDetailChartBox" class="chart-box" style="display:none; margin-bottom:8px;">
+            <h4 style="font-size: 12px; color: #64748b; margin-bottom: 2px;">📊 当日消费分类占比</h4>
+            <div class="chart-container-compact">
+                <canvas id="dayDetailCategoryChart"></canvas>
+            </div>
+        </div>
+
+        <div id="dayDetailFeedList"></div>
+    </div>
+
+    <!-- TAB 3: 近30天可视化饼图 -->
+    <div id="tab-chart" class="tab-content">
+        <div class="chart-box">
+            <h3 style="font-size: 14px; margin-bottom: 10px;">近 30 天消费构成占比</h3>
+            <div style="position: relative; height:260px; width:100%;">
+                <canvas id="categoryChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 4: AI 颁奖月报 -->
+    <div id="tab-report" class="tab-content">
+        <div class="report-box">
+            <h3>🏆 双人月度消费颁奖典礼</h3>
+            <p style="font-size: 12px; color: #64748b; margin: 6px 0;">一键让 AI 深度梳理云端账单，生成专属总结与奖项</p>
+            <button class="btn-action" id="genReportBtn" onclick="generateMonthlyReport()">✨ 召唤 AI 生成颁奖总结</button>
+            <div class="report-content" id="reportResult" style="display:none;"></div>
+        </div>
+    </div>
+
+    <!-- 底部固定输入栏 -->
+    <div class="input-area">
+        <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;" onchange="processReceiptImage(event)">
+        <button class="btn-icon" onclick="document.getElementById('cameraInput').click()" title="拍照/上传小票">📷</button>
+        <button class="btn-icon" id="micBtn" onclick="toggleVoiceInput()" title="按住语音输入">🎙️</button>
+        <input type="text" id="userInput" placeholder="输入或📷拍照小票，例: 猪肉 25" onkeypress="if(event.key==='Enter') addExpense()">
+        <button class="send" id="sendBtn" onclick="addExpense()">记账</button>
+    </div>
+</div>
+
+<!-- 修改账单记录弹窗 -->
+<div class="modal-overlay" id="editModal">
+    <div class="modal-card">
+        <h3 style="font-size: 15px; color: #0f172a; margin-bottom: 12px;">✏️ 修改账单记录</h3>
+        <input type="hidden" id="editDocId">
+        <div style="display:flex; flex-direction:column; gap:10px; font-size:12px;">
+            <label style="color:#64748b;">账单名称：
+                <input type="text" id="editDesc" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; margin-top:4px;">
+            </label>
+            <label style="color:#64748b;">消费金额 (元)：
+                <input type="number" step="0.01" id="editAmount" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; margin-top:4px;">
+            </label>
+            <label style="color:#64748b;">精细消费分类：
+                <select id="editCategory" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:8px; font-size:13px; margin-top:4px;">
+                    <option value="🥦生鲜食材">🥦 生鲜食材 (猪肉/牛肉/蔬菜/生鲜食材)</option>
+                    <option value="🍱正餐外卖">🍱 正餐外卖 (猪脚饭/煲仔饭/快餐外卖)</option>
+                    <option value="🍰零食甜品">🍰 零食甜品 (蛋糕/面包/甜点/零食)</option>
+                    <option value="☕咖啡奶茶">☕ 咖啡奶茶 (咖啡/奶茶/饮品/下午茶)</option>
+                    <option value="🍲约会大餐">🍲 约会大餐 (火锅/烧烤/聚餐大餐)</option>
+                    <option value="🌾粮油调味">🌾 粮油调味 (米面/食用油/酱料调料)</option>
+                    <option value="🧻日用百货">🧻 日用百货 (纸巾/洗洁精/清洁用品)</option>
+                    <option value="🏠厨具家电">🏠 厨具家电 (菜刀/锅具/餐具小家电)</option>
+                    <option value="👗服饰美妆">👗 服饰美妆 (衣服/鞋包/护肤彩妆)</option>
+                    <option value="🚗交通出行">🚗 交通出行 (打车/滴滴/公交/加油)</option>
+                    <option value="🎬电影娱乐">🎬 电影娱乐 (电影/游戏/演出/会员)</option>
+                    <option value="🐱宠物开销">🐱 宠物开销 (猫粮/狗粮/宠物用品)</option>
+                    <option value="其他">其他</option>
+                </select>
+            </label>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+            <button onclick="closeEditModal()" style="padding:8px 14px; border:1px solid #cbd5e1; background:#f1f5f9; border-radius:8px; font-size:12px; font-weight:bold; cursor:pointer; color:#475569;">取消</button>
+            <button onclick="saveEditExpense()" style="padding:8px 14px; border:none; background:#4f46e5; color:white; border-radius:8px; font-size:12px; font-weight:bold; cursor:pointer;">保存修改</button>
+        </div>
+    </div>
+</div>
+
+<script>
     // -------------------------------------------------------------
+    // Supabase 配置参数
+    // -------------------------------------------------------------
+    const SUPABASE_URL = "https://iwkxtadpwylevprczxsz.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml3a3h0YWRwd3lsZXZwcmN6eHN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4Mjk3MzQsImV4cCI6MjEwMTQwNTczNH0.hLrPvB43rmCjiMlwQCe5lPmy6ilyC3wD7ytsV14tSOE";
+
+    // 🌟 重命名防冲突：避免与官方 SDK 变量同名 🌟
+    let supabaseClient = null;
+
+    function getSupabaseClient() {
+        if (supabaseClient) return supabaseClient;
+        if (window.supabase && typeof window.supabase.createClient === 'function') {
+            try {
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                    auth: { persistSession: false }
+                });
+                return supabaseClient;
+            } catch (err) {
+                console.error("Supabase 初始化出错：", err);
+            }
+        }
+        return null;
+    }
+
+    let currentPersona = 'cat';
+    let expenses = [];
+    let monthlyBudget = 2500;
+    
+    // 图表句柄
+    let monthlyChartInstance = null;
+    let todayChartInstance = null;
+    let dayDetailChartInstance = null;
+    
+    let isRecording = false;
+    let recognition = null;
+    let selectedDetailDate = '';
+
+    const presets = {
+        'zhipu-free': { host: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash' },
+        'siliconflow-free': { host: 'https://api.siliconflow.cn/v1', model: 'Qwen/Qwen2.5-7B-Instruct' },
+        'deepseek-official': { host: 'https://api.deepseek.com/v1', model: 'deepseek-chat' }
+    };
+
+    // 当 Supabase SDK 成功从 CDN 加载完毕时自动触发
+    window.onSupabaseInit = function() {
+        const client = getSupabaseClient();
+        if (client) {
+            console.log("云数据库已就绪，开始拉取数据！");
+            const badge = document.getElementById('syncBadgeText');
+            if (badge) badge.innerText = "🟢 云端秒级同步中";
+            loadBudget();
+            fetchExpenses();
+            subscribeRealtime();
+        }
+    };
+
+    window.onload = function() {
+        document.getElementById('platformPreset').value = localStorage.getItem('platform_preset') || 'zhipu-free';
+        document.getElementById('apiKey').value = localStorage.getItem('api_key') || '';
+        applyPreset();
+        initSpeechRecognition();
+
+        // 尝试立即初始化
+        if (window.isSupabaseReady) {
+            window.onSupabaseInit();
+        }
+
+        // 定时轮询与获得焦点刷新
+        setInterval(() => {
+            if (getSupabaseClient()) fetchExpenses(true);
+        }, 2500);
+
+        window.addEventListener('focus', () => {
+            if (getSupabaseClient()) fetchExpenses(true);
+        });
+    };
+
+    function applyPreset() {
+        const selected = document.getElementById('platformPreset').value;
+        const config = presets[selected] || presets['zhipu-free'];
+        
+        document.getElementById('apiHost').value = config.host;
+        document.getElementById('modelName').value = config.model;
+        localStorage.setItem('platform_preset', selected);
+        saveConfig();
+    }
+
+    function saveConfig() {
+        localStorage.setItem('api_key', document.getElementById('apiKey').value.trim());
+    }
+
+    async function loadBudget() {
+        const client = getSupabaseClient();
+        if (!client) return;
+        try {
+            const { data } = await client.from('settings').select('*').eq('id', 'budget').single();
+            if (data) {
+                monthlyBudget = Number(data.value) || 2500;
+                document.getElementById('budgetInput').value = monthlyBudget;
+                updateDashboardTotal();
+            }
+        } catch (e) { console.warn("获取预算失败：", e); }
+    }
+
+    async function fetchExpenses(isSilent = false) {
+        const client = getSupabaseClient();
+        if (!client) {
+            if (!isSilent) document.getElementById('todayFeedList').innerHTML = '<div style="text-align:center; color:#ef4444; padding:20px 0; font-size:12px;">⚠️ 正在连接云数据库，请稍等...</div>';
+            return;
+        }
+
+        const sixMonthsAgo = Date.now() - (180 * 24 * 60 * 60 * 1000);
+        try {
+            const { data, error } = await client
+                .from('expenses')
+                .select('*')
+                .gte('timestamp', sixMonthsAgo)
+                .order('timestamp', { ascending: true });
+
+            if (!error && data) {
+                expenses = data.map(item => ({
+                    id: item.id,
+                    amount: item.amount,
+                    category: item.category,
+                    description: item.description,
+                    aiComment: item.ai_comment,
+                    badge: item.badge,
+                    personaName: item.persona_name,
+                    date: item.date,
+                    time: item.time,
+                    timestamp: item.timestamp
+                }));
+
+                renderTodayFeed();
+                renderHistoryBanners();
+                if(selectedDetailDate) renderDayDetail(selectedDetailDate);
+                updateDashboardTotal();
+            } else if (error && !isSilent) {
+                console.error("数据库查询报错：", error);
+            }
+        } catch(err) {
+            console.warn("网络拉取异常：", err);
+        }
+    }
+
+    function subscribeRealtime() {
+        const client = getSupabaseClient();
+        if (!client) return;
+        try {
+            client
+                .channel('public:expenses')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, payload => {
+                    fetchExpenses(true);
+                })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, payload => {
+                    loadBudget();
+                })
+                .subscribe();
+        } catch(e) { console.warn("Realtime 订阅异常：", e); }
+    }
+
+    async function updateBudget() {
+        const val = Number(document.getElementById('budgetInput').value) || 2500;
+        const client = getSupabaseClient();
+        if (client) {
+            await client.from('settings').upsert({ id: 'budget', value: val });
+        }
+    }
+
+    function setPersona(type) {
+        currentPersona = type;
+        document.querySelectorAll('.persona-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(`btn-${type}`).classList.add('active');
+    }
+
+    function switchTab(tabName) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        
+        if(tabName === 'today') {
+            document.getElementById('tab-btn-today').classList.add('active');
+            document.getElementById('tab-today').classList.add('active');
+        } else if(tabName === 'history') {
+            document.getElementById('tab-btn-history').classList.add('active');
+            document.getElementById('tab-history').classList.add('active');
+        } else {
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+        }
+
+        if(tabName === 'chart') renderMonthlyChart();
+    }
+
+    function renderPieChart(canvasId, items, existingChartInstance) {
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        const categoryTotals = {};
+        
+        items.forEach(item => {
+            const cat = item.category || '其他';
+            categoryTotals[cat] = (categoryTotals[cat] || 0) + Number(item.amount || 0);
+        });
+
+        const labels = Object.keys(categoryTotals);
+        const data = Object.values(categoryTotals);
+
+        if(existingChartInstance) existingChartInstance.destroy();
+
+        return new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: [
+                        '#10b981', '#6366f1', '#ec4899', '#f59e0b', '#ef4444', 
+                        '#f97316', '#64748b', '#8b5cf6', '#a855f7', '#06b6d4', 
+                        '#3b82f6', '#eab308', '#94a3b8'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { boxWidth: 10, font: { size: 10 } }
+                    }
+                }
+            }
+        });
+    }
+
+    function renderTodayFeed() {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const todayListEl = document.getElementById('todayFeedList');
+        todayListEl.innerHTML = '';
+
+        const todayItems = expenses.filter(item => item.date === todayStr).reverse();
+        let todaySum = 0;
+
+        if(todayItems.length === 0) {
+            todayListEl.innerHTML = '<div style="text-align:center; color:#94a3b8; padding:30px 0; font-size:13px;">今天还没记账呢，去记一笔试试看吧！</div>';
+            document.getElementById('todayChartBox').style.display = 'none';
+        } else {
+            todayItems.forEach(item => {
+                todaySum += Number(item.amount || 0);
+                todayListEl.appendChild(createCardElement(item));
+            });
+            document.getElementById('todayChartBox').style.display = 'block';
+            todayChartInstance = renderPieChart('todayCategoryChart', todayItems, todayChartInstance);
+        }
+
+        document.getElementById('todayTotalBanner').innerText = `今日消费小计：￥${todaySum.toFixed(2)}`;
+    }
+
+    function renderHistoryBanners() {
+        const historyListEl = document.getElementById('historyBannersList');
+        historyListEl.innerHTML = '';
+
+        const groups = {};
+        expenses.forEach(item => {
+            const dateStr = item.date || '未知日期';
+            if(!groups[dateStr]) groups[dateStr] = { count: 0, total: 0 };
+            groups[dateStr].count += 1;
+            groups[dateStr].total += Number(item.amount || 0);
+        });
+
+        const sortedDates = Object.keys(groups).sort().reverse();
+
+        if(sortedDates.length === 0) {
+            historyListEl.innerHTML = '<div style="text-align:center; color:#94a3b8; padding:30px 0; font-size:13px;">暂无历史账单记录</div>';
+            return;
+        }
+
+        sortedDates.forEach(dateStr => {
+            const group = groups[dateStr];
+            const banner = document.createElement('div');
+            banner.className = 'day-banner';
+            banner.onclick = () => openDayDetail(dateStr);
+            banner.innerHTML = `
+                <div>
+                    <div class="day-banner-date">📅 ${dateStr}</div>
+                    <div class="day-banner-count">共 ${group.count} 笔消费</div>
+                </div>
+                <div class="day-banner-right">
+                    <div class="day-banner-total">￥${group.total.toFixed(2)}</div>
+                    <div class="day-banner-arrow">点击查看明细 ➔</div>
+                </div>
+            `;
+            historyListEl.appendChild(banner);
+        });
+    }
+
+    function openDayDetail(dateStr) {
+        selectedDetailDate = dateStr;
+        document.getElementById('detailTitle').innerText = `${dateStr} 消费明细`;
+        renderDayDetail(dateStr);
+        
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        document.getElementById('tab-day-detail').classList.add('active');
+    }
+
+    function renderDayDetail(dateStr) {
+        const detailListEl = document.getElementById('dayDetailFeedList');
+        detailListEl.innerHTML = '';
+
+        const dayItems = expenses.filter(item => item.date === dateStr).reverse();
+        
+        if(dayItems.length > 0) {
+            document.getElementById('dayDetailChartBox').style.display = 'block';
+            dayDetailChartInstance = renderPieChart('dayDetailCategoryChart', dayItems, dayDetailChartInstance);
+        } else {
+            document.getElementById('dayDetailChartBox').style.display = 'none';
+        }
+
+        dayItems.forEach(item => {
+            detailListEl.appendChild(createCardElement(item));
+        });
+    }
+
+    function createCardElement(item) {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.style.marginBottom = '8px';
+        card.innerHTML = `
+            <div class="card-header">
+                <span>${item.description}</span>
+                <span class="card-amount">￥${Number(item.amount).toFixed(2)}</span>
+            </div>
+            <div class="card-sub">分类: ${item.category} | 时间: ${item.time}</div>
+            <div class="ai-box"><strong>${item.personaName}：</strong>${item.aiComment}</div>
+            <div class="card-footer">
+                <span class="ai-badge">${item.badge}</span>
+                <div>
+                    <button onclick="openEditModal('${item.id}')" style="color:#4f46e5; font-size:11px; border:none; background:none; cursor:pointer; margin-right:8px; font-weight:bold;">✏️ 修改</button>
+                    <button class="btn-delete" onclick="deleteExpense('${item.id}')">🗑️ 删除</button>
+                </div>
+            </div>
+        `;
+        return card;
+    }
+
+    function openEditModal(docId) {
+        const item = expenses.find(e => e.id === docId);
+        if (!item) return;
+        document.getElementById('editDocId').value = docId;
+        document.getElementById('editDesc').value = item.description || '';
+        document.getElementById('editAmount').value = item.amount || 0;
+        document.getElementById('editCategory').value = item.category || '其他';
+        document.getElementById('editModal').style.display = 'flex';
+    }
+
+    function closeEditModal() {
+        document.getElementById('editModal').style.display = 'none';
+    }
+
+    async function saveEditExpense() {
+        const docId = document.getElementById('editDocId').value;
+        const newDesc = document.getElementById('editDesc').value.trim();
+        const newAmount = Number(document.getElementById('editAmount').value) || 0;
+        const newCategory = document.getElementById('editCategory').value;
+
+        if (!newDesc) return alert('请输入账单名称！');
+        if (newAmount <= 0) return alert('金额必须大于 0 元！');
+
+        const client = getSupabaseClient();
+        if (!client) return alert('云数据库未连接成功，请刷新网页后再试！');
+
+        try {
+            await client.from('expenses').update({
+                description: newDesc,
+                amount: newAmount,
+                category: newCategory
+            }).eq('id', docId);
+            closeEditModal();
+            fetchExpenses(true);
+        } catch (err) {
+            alert('修改失败：' + err.message);
+        }
+    }
+
+    async function deleteExpense(docId) {
+        const client = getSupabaseClient();
+        if (!client) return alert('云数据库未连接成功，请刷新网页后再试！');
+
+        if(confirm('确定要从云端删除这条记录吗？对方的手机上也会同步删除哦！')) {
+            await client.from('expenses').delete().eq('id', docId);
+            fetchExpenses(true);
+        }
+    }
+
+    function updateDashboardTotal() {
+        let monthTotal = 0;
+        expenses.forEach(item => { monthTotal += Number(item.amount || 0); });
+
+        document.getElementById('totalExpense').innerText = `￥${monthTotal.toFixed(2)}`;
+        const percent = Math.min(Math.round((monthTotal / monthlyBudget) * 100), 100);
+        document.getElementById('progressFill').style.width = `${percent}%`;
+        document.getElementById('budgetPercent').innerText = `预算已用: ${percent}%`;
+        document.getElementById('budgetRemain').innerText = `剩余: ￥${(monthlyBudget - monthTotal).toFixed(2)}`;
+    }
+
+    function renderMonthlyChart() {
+        monthlyChartInstance = renderPieChart('categoryChart', expenses, monthlyChartInstance);
+    }
+
+    async function generateMonthlyReport() {
+        const apiKey = document.getElementById('apiKey').value.trim();
+        let apiHost = document.getElementById('apiHost').value.trim() || "https://open.bigmodel.cn/api/paas/v4";
+        let modelName = document.getElementById('modelName').value.trim() || "glm-4-flash";
+
+        if(!apiKey) return alert('请先在明细设置里填入 API Key！');
+        if(expenses.length === 0) return alert('数据库里还没有数据，先去记几笔吧！');
+
+        const btn = document.getElementById('genReportBtn');
+        const resEl = document.getElementById('reportResult');
+        btn.disabled = true; btn.innerText = 'AI 正在撰写颁奖词...';
+
+        const summaryData = expenses.map(e => `${e.date} ${e.description} ￥${e.amount} (${e.category})`).join('\n');
+        const prompt = `你是一位幽默风趣的高情商情侣财务管家。请分析以下这对情侣近期的云端账单明细，为他们撰写一份《月度消费颁奖典礼与情侣报告》。
+结构要求：
+1. 🏆 颁发 2~3 个搞笑极具特色的消费奖项。
+2. 💡 对两人的消费结构进行幽默点评与未来建议。
+3. 💕 给予一句关于爱情与生活的温馨祝福。
+账单数据：\n${summaryData}`;
+
+        try {
+            const response = await fetch(`${apiHost}/chat/completions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                body: JSON.stringify({ model: modelName, messages: [{ role: 'user', content: prompt }] })
+            });
+
+            const data = await response.json();
+            resEl.innerText = data.choices[0].message.content;
+            resEl.style.display = 'block';
+        } catch(err) {
+            alert('生成报告失败：' + err.message);
+        } finally {
+            btn.disabled = false; btn.innerText = '✨ 重新生成 AI 颁奖总结';
+        }
+    }
+
+    // 📷 拍照小票识别
+    async function processReceiptImage(event) {
+        const client = getSupabaseClient();
+        if (!client) return alert('云数据库未连接成功，请刷新网页重试！');
+
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const apiKey = document.getElementById('apiKey').value.trim();
+        let apiHost = document.getElementById('apiHost').value.trim() || "https://open.bigmodel.cn/api/paas/v4";
+        let modelName = document.getElementById('modelName').value.trim() || "glm-4-flash";
+
+        if (!apiKey) return alert('请先在设置中填入 API Key！');
+
+        if (modelName === 'glm-4-flash') modelName = 'glm-4v-flash';
+        else if (modelName === 'Qwen/Qwen2.5-7B-Instruct') modelName = 'Qwen/Qwen2-VL-7B-Instruct';
+
+        const sendBtn = document.getElementById('sendBtn');
+        sendBtn.disabled = true; sendBtn.innerText = '📷 识别小票中...';
+
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            const base64Image = e.target.result;
+            
+            const systemPrompt = `分析小票图片，提取每个商品明细。分类必须严格按照以下标准选择（不能混淆）：
+- 🥦生鲜食材：纯食材/生鲜食材。特别规则：凡是纯食材名称（如猪肉、牛肉、鸡肉、羊肉、蔬菜、娃娃菜、鸡蛋、鱼、虾等），即便没带“生”字，也必须强行归为【🥦生鲜食材】！严禁归为正餐外卖！
+- 🍱正餐外卖：做好的现成菜品/主食/快餐/外卖（如猪脚饭、牛肉煲仔饭、黄焖鸡米饭、炒面、快餐、外卖等）。
+- 🍰零食甜品：蛋糕、面包、烘焙糕点、甜点、坚果薯片、零食熟食。
+- ☕咖啡奶茶：咖啡、奶茶、果茶、饮品饮料。
+- 🍲约会大餐：火锅、烧烤、情侣约会大餐、精致餐厅聚餐。
+- 🌾粮油调味：米面、食用油、调味料、干货、冲调麦片。
+- 🧻日用百货：纸巾、抽纸、洗洁精、洗衣液、清洁洗护用品。
+- 🏠厨具家电：菜刀、锅具、碗筷餐具、厨房小家电。
+- 👗服饰美妆：衣服、鞋包、护肤彩妆。
+- 🚗交通出行：打车、滴滴、公交地铁、加油停车。
+- 🎬电影娱乐：电影票、游戏氪金、演出、会员充值。
+- 🐱宠物开销：猫粮、狗粮、宠物用品。
+- 其他：杂项开销
+
+必须严格只返回 JSON 数组格式，不要 Markdown：
+[{"amount":12.5, "category":"🥦生鲜食材", "description":"猪肉", "aiComment":"短评", "badge":"勋章"}]`;
+
+            try {
+                const response = await fetch(`${apiHost}/chat/completions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                    body: JSON.stringify({
+                        model: modelName,
+                        messages: [{ role: 'user', content: [{ type: 'text', text: systemPrompt }, { type: 'image_url', image_url: { url: base64Image } }] }]
+                    })
+                });
+
+                const data = await response.json();
+                const jsonMatch = data.choices[0].message.content.match(/\[[\s\S]*\]/);
+                const items = JSON.parse(jsonMatch[0]);
+
+                const personaNames = { cat: '🐱 毒舌猫', angel: '👼 夸夸天使', abacus: '🧮 算盘娘', cyber: '🤖 赛博理财' };
+                const now = new Date();
+                let count = 0;
+
+                for (const item of items) {
+                    if (!item.amount || item.amount <= 0) continue;
+                    await client.from('expenses').insert([{
+                        amount: Number(item.amount) || 0,
+                        category: item.category || '🥦生鲜食材',
+                        description: item.description || '小票商品',
+                        ai_comment: item.aiComment || '小票识别记录',
+                        badge: item.badge || '小票达人',
+                        persona_name: personaNames[currentPersona],
+                        date: now.toISOString().split('T')[0],
+                        time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        timestamp: Date.now() + count
+                    }]);
+                    count++;
+                }
+                alert(`🎉 成功识别小票！已精准拆分记录了 ${count} 笔消费！`);
+                fetchExpenses(true);
+            } catch (err) {
+                alert('识别失败：' + err.message);
+            } finally {
+                sendBtn.disabled = false; sendBtn.innerText = '记账';
+                event.target.value = '';
+            }
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function initSpeechRecognition() {
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRec();
+            recognition.lang = 'zh-CN';
+            recognition.onresult = function(event) {
+                document.getElementById('userInput').value = event.results[0][0].transcript;
+                stopVoiceInput();
+            };
+            recognition.onerror = stopVoiceInput;
+            recognition.onend = stopVoiceInput;
+        } else {
+            document.getElementById('micBtn').style.display = 'none';
+        }
+    }
+
+    function toggleVoiceInput() {
+        if(!recognition) return alert('当前浏览器不支持语音识别');
+        const micBtn = document.getElementById('micBtn');
+        if(!isRecording) { recognition.start(); isRecording = true; micBtn.classList.add('recording'); } 
+        else { stopVoiceInput(); }
+    }
+
+    function stopVoiceInput() {
+        if(recognition && isRecording) { recognition.stop(); }
+        isRecording = false;
+        document.getElementById('micBtn').classList.remove('recording');
+    }
+
+    // ✏️ 文本记账
+    async function addExpense() {
+        const client = getSupabaseClient();
+        if (!client) return alert('云数据库正在初始化中，请等 2 秒后再试！');
+
+        const inputEl = document.getElementById('userInput');
+        const text = inputEl.value.trim();
+        const apiKey = document.getElementById('apiKey').value.trim();
+        
+        let apiHost = document.getElementById('apiHost').value.trim() || "https://open.bigmodel.cn/api/paas/v4";
+        let modelName = document.getElementById('modelName').value.trim() || "glm-4-flash";
+
+        if (!text) return alert('请输入消费内容！');
+        if (!apiKey) return alert('请先在设置中填入 API Key！');
+
+        const sendBtn = document.getElementById('sendBtn');
+        sendBtn.disabled = true; sendBtn.innerText = '分析中...';
+
+        const systemPrompt = `分析用户的消费文本，提取金额和分类，并给出 80 字以内的特色点评和评价勋章。
+
+分类必须严格按照以下标准精确归类（严禁混淆）：
+- 🥦生鲜食材：纯食材/生鲜食材。特别规则：凡是纯食材名词（如猪肉、牛肉、鸡肉、羊肉、蔬菜、娃娃菜、鸡蛋、鱼、虾等），即便没带“生”字，也必须强行归为【🥦生鲜食材】！严禁归为正餐外卖！
+- 🍱正餐外卖：做好的现成菜品/主食/快餐/外卖（如猪脚饭、牛肉煲仔饭、黄焖鸡米饭、炒面、快餐、外卖等）。
+- 🍰零食甜品：蛋糕、面包、烘焙糕点、甜点、坚果薯片、冰淇淋、零食熟食。
+- ☕咖啡奶茶：咖啡、奶茶、果茶、饮品饮料、下午茶。
+- 🍲约会大餐：火锅、烧烤、情侣约会大餐、精致餐厅聚餐。
+- 🌾粮油调味：米面、食用油、调味料、干货、冲调麦片。
+- 🧻日用百货：纸巾、抽纸、洗洁精、洗衣液、清洁洗护用品。
+- 🏠厨具家电：菜刀、锅具、碗筷餐具、厨房小家电。
+- 👗服饰美妆：衣服、鞋包、护肤彩妆。
+- 🚗交通出行：打车、滴滴、公交地铁、加油停车。
+- 🎬电影娱乐：电影票、游戏氪金、演出、会员充值。
+- 🐱宠物开销：猫粮、狗粮、宠物用品。
+- 其他：杂项开销
+
+必须严格只返回 JSON 格式，不要 Markdown：
+{"amount": 数字, "category": "分类名称", "description": "简短名称", "aiComment": "点评", "badge": "勋章"}`;
+
+        try {
+            const response = await fetch(`${apiHost}/chat/completions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                body: JSON.stringify({ model: modelName, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: text }] })
+            });
+
+            const data = await response.json();
+            if (!data.choices || !data.choices[0]) {
+                throw new Error("AI 接口未返回数据，请检查 API Key！");
+            }
+            const res = JSON.parse(data.choices[0].message.content.match(/\{[\s\S]*\}/)[0]);
+            const personaNames = { cat: '🐱 毒舌猫', angel: '👼 夸夸天使', abacus: '🧮 算盘娘', cyber: '🤖 赛博理财' };
+            const now = new Date();
+
+            const { error: insertError } = await client.from('expenses').insert([{
+                amount: res.amount || 0,
+                category: res.category || '其他',
+                description: res.description || text,
+                ai_comment: res.aiComment || '点评...',
+                badge: res.badge || '消费达人',
+                persona_name: personaNames[currentPersona],
+                date: now.toISOString().split('T')[0],
+                time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                timestamp: Date.now()
+            }]);
+
+            if (insertError) {
+                alert("写入数据库失败：" + insertError.message);
+            } else {
+                inputEl.value = '';
+                fetchExpenses(true);
+            }
+        } catch (err) {
+            alert('记账失败：' + err.message);
+        } finally {
+            sendBtn.disabled = false; sendBtn.innerText = '记账';
+        }
+    }
+</script>
+</body>
+</html>
+
     // Supabase 配置参数
     // -------------------------------------------------------------
     const SUPABASE_URL = "https://iwkxtadpwylevprczxsz.supabase.co";
