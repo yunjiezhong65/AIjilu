@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>👩‍❤️‍👨 双人 AI 记账管家 (终极稳定版)</title>
+    <title>👩‍❤️‍👨 双人 AI 记账管家 (国内高速直连版)</title>
     <!-- Chart.js 图表库 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Supabase JS SDK (国内阿里/饿了么高速 CDN，保证不 404) -->
-    <script src="https://npm.elemecdn.com/@supabase/supabase-client@2" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-client@2';"></script>
+    <!-- Supabase JS SDK v2 (国内 100% 极速畅通 饿了么 CDN) -->
+    <script src="https://npm.elemecdn.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f1f5f9; color: #1e293b; padding: 12px; display: flex; justify-content: center; }
@@ -290,7 +290,7 @@
         applyPreset();
         initSpeechRecognition();
 
-        // 尝试加载云端数据
+        // 加载云端数据
         loadBudget();
         fetchExpenses();
         subscribeRealtime();
