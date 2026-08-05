@@ -133,13 +133,13 @@
             <div class="dash-total" id="totalExpense">￥0.00</div>
             <div>
                 <span class="dash-title">月预算 ￥</span>
-                <input type="number" id="budgetInput" class="budget-input-inline" value="5000" onchange="updateBudget()">
+                <input type="number" id="budgetInput" class="budget-input-inline" value="2500" onchange="updateBudget()">
             </div>
         </div>
         <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill"></div></div>
         <div class="dash-row" style="font-size: 11px; opacity: 0.9;">
             <span id="budgetPercent">预算使用: 0%</span>
-            <span id="budgetRemain">剩余: ￥5000</span>
+            <span id="budgetRemain">剩余: ￥2500</span>
         </div>
     </div>
 
@@ -285,7 +285,7 @@
     // Supabase 配置参数
     // -------------------------------------------------------------
     const SUPABASE_URL = "https://iwkxtadpwylevprczxsz.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml3a3h0YWRwd3lsZXZwcmN6eHN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzg2NTU3NzEsImV4cCI6MjA1NDIzMTc3MX0.4M3wB8lM1Jz-mN5S75Jk49V0OaU1oN2J7V8a2N5N1M8";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml3a3h0YWRwd3lsZXZwcmN6eHN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4Mjk3MzQsImV4cCI6MjEwMTQwNTczNH0.hLrPvB43rmCjiMlwQCe5lPmy6ilyC3wD7ytsV14tSOE";
 
     // 🌟 重命名防冲突：避免与官方 SDK 变量同名 🌟
     let supabaseClient = null;
@@ -307,7 +307,7 @@
 
     let currentPersona = 'cat';
     let expenses = [];
-    let monthlyBudget = 5000;
+    let monthlyBudget = 2500;
     
     // 图表句柄
     let monthlyChartInstance = null;
@@ -351,7 +351,7 @@
         // 定时轮询与获得焦点刷新
         setInterval(() => {
             if (getSupabaseClient()) fetchExpenses(true);
-        }, 5000);
+        }, 2500);
 
         window.addEventListener('focus', () => {
             if (getSupabaseClient()) fetchExpenses(true);
@@ -378,7 +378,7 @@
         try {
             const { data } = await client.from('settings').select('*').eq('id', 'budget').single();
             if (data) {
-                monthlyBudget = Number(data.value) || 5000;
+                monthlyBudget = Number(data.value) || 2500;
                 document.getElementById('budgetInput').value = monthlyBudget;
                 updateDashboardTotal();
             }
@@ -443,7 +443,7 @@
     }
 
     async function updateBudget() {
-        const val = Number(document.getElementById('budgetInput').value) || 5000;
+        const val = Number(document.getElementById('budgetInput').value) || 2500;
         const client = getSupabaseClient();
         if (client) {
             await client.from('settings').upsert({ id: 'budget', value: val });
