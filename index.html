@@ -7,15 +7,15 @@
     <!-- Chart.js 图表库 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
-    <!-- 🌟 多 CDN 容灾动态加载器 (彻底解决 Supabase SDK 在国内加载 404 / 卡死问题) 🌟 -->
+    <!-- 🌟 多 CDN 容灾动态加载器 (彻底解决 Supabase SDK 加载问题) 🌟 -->
     <script>
         window.isSupabaseReady = false;
         (function loadSupabaseWithFallback() {
             const cdns = [
+                'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js',
                 'https://npm.elemecdn.com/@supabase/supabase-js@2/dist/umd/supabase.js',
                 'https://registry.npmmirror.com/@supabase/supabase-js/2.39.8/files/dist/umd/supabase.js',
-                'https://cdn.staticfile.net/supabase-js/2.39.8/supabase.js',
-                'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js'
+                'https://cdn.staticfile.net/supabase-js/2.39.8/supabase.js'
             ];
             let index = 0;
             function tryNextCDN() {
@@ -287,16 +287,17 @@
     const SUPABASE_URL = "https://iwkxtadpwylevprczxsz.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml3a3h0YWRwd3lsZXZwcmN6eHN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzg2NTU3NzEsImV4cCI6MjA1NDIzMTc3MX0.4M3wB8lM1Jz-mN5S75Jk49V0OaU1oN2J7V8a2N5N1M8";
 
-    let supabase = null;
+    // 🌟 重命名防冲突：避免与官方 SDK 变量同名 🌟
+    let supabaseClient = null;
 
-    function getSupabase() {
-        if (supabase) return supabase;
+    function getSupabaseClient() {
+        if (supabaseClient) return supabaseClient;
         if (window.supabase && typeof window.supabase.createClient === 'function') {
             try {
-                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
                     auth: { persistSession: false }
                 });
-                return supabase;
+                return supabaseClient;
             } catch (err) {
                 console.error("Supabase 初始化出错：", err);
             }
@@ -325,10 +326,11 @@
 
     // 当 Supabase SDK 成功从 CDN 加载完毕时自动触发
     window.onSupabaseInit = function() {
-        const client = getSupabase();
+        const client = getSupabaseClient();
         if (client) {
             console.log("云数据库已就绪，开始拉取数据！");
-            document.getElementById('syncBadgeText').innerText = "🟢 云端秒级同步中";
+            const badge = document.getElementById('syncBadgeText');
+            if (badge) badge.innerText = "🟢 云端秒级同步中";
             loadBudget();
             fetchExpenses();
             subscribeRealtime();
@@ -346,13 +348,13 @@
             window.onSupabaseInit();
         }
 
-        // 🌟 核心防干预兜底：针对国内移动网络 4G/5G 容易丢 WebSocket 的问题，增加每 5 秒轮询 + 获得焦点自动刷新 🌟
+        // 定时轮询与获得焦点刷新
         setInterval(() => {
-            if (getSupabase()) fetchExpenses(true);
+            if (getSupabaseClient()) fetchExpenses(true);
         }, 5000);
 
         window.addEventListener('focus', () => {
-            if (getSupabase()) fetchExpenses(true);
+            if (getSupabaseClient()) fetchExpenses(true);
         });
     };
 
@@ -360,7 +362,6 @@
         const selected = document.getElementById('platformPreset').value;
         const config = presets[selected] || presets['zhipu-free'];
         
-        // 强行把完整 URL 填入 input 框，防止发送给本地相对路径
         document.getElementById('apiHost').value = config.host;
         document.getElementById('modelName').value = config.model;
         localStorage.setItem('platform_preset', selected);
@@ -372,7 +373,7 @@
     }
 
     async function loadBudget() {
-        const client = getSupabase();
+        const client = getSupabaseClient();
         if (!client) return;
         try {
             const { data } = await client.from('settings').select('*').eq('id', 'budget').single();
@@ -385,7 +386,7 @@
     }
 
     async function fetchExpenses(isSilent = false) {
-        const client = getSupabase();
+        const client = getSupabaseClient();
         if (!client) {
             if (!isSilent) document.getElementById('todayFeedList').innerHTML = '<div style="text-align:center; color:#ef4444; padding:20px 0; font-size:12px;">⚠️ 正在连接云数据库，请稍等...</div>';
             return;
@@ -426,7 +427,7 @@
     }
 
     function subscribeRealtime() {
-        const client = getSupabase();
+        const client = getSupabaseClient();
         if (!client) return;
         try {
             client
@@ -443,7 +444,7 @@
 
     async function updateBudget() {
         const val = Number(document.getElementById('budgetInput').value) || 5000;
-        const client = getSupabase();
+        const client = getSupabaseClient();
         if (client) {
             await client.from('settings').upsert({ id: 'budget', value: val });
         }
@@ -645,7 +646,7 @@
         if (!newDesc) return alert('请输入账单名称！');
         if (newAmount <= 0) return alert('金额必须大于 0 元！');
 
-        const client = getSupabase();
+        const client = getSupabaseClient();
         if (!client) return alert('云数据库未连接成功，请刷新网页后再试！');
 
         try {
@@ -662,7 +663,7 @@
     }
 
     async function deleteExpense(docId) {
-        const client = getSupabase();
+        const client = getSupabaseClient();
         if (!client) return alert('云数据库未连接成功，请刷新网页后再试！');
 
         if(confirm('确定要从云端删除这条记录吗？对方的手机上也会同步删除哦！')) {
@@ -725,7 +726,7 @@
 
     // 📷 拍照小票识别
     async function processReceiptImage(event) {
-        const client = getSupabase();
+        const client = getSupabaseClient();
         if (!client) return alert('云数据库未连接成功，请刷新网页重试！');
 
         const file = event.target.files[0];
@@ -841,7 +842,7 @@
 
     // ✏️ 文本记账
     async function addExpense() {
-        const client = getSupabase();
+        const client = getSupabaseClient();
         if (!client) return alert('云数据库正在初始化中，请等 2 秒后再试！');
 
         const inputEl = document.getElementById('userInput');
