@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>👩‍❤️‍👨 双人 AI 记账管家 (完美版)</title>
+    <title>👩‍❤️‍👨 双人 AI 记账管家 (小票精准识别版)</title>
     <!-- Chart.js 图表库 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
@@ -373,7 +373,6 @@
         const client = getSupabaseClient();
         if (!client) return;
         try {
-            // 🌟 修复 406 报错：改用 maybeSingle()，查不到数据时静默返回 null 🌟
             const { data } = await client.from('settings').select('*').eq('id', 'budget').maybeSingle();
             if (data) {
                 monthlyBudget = Number(data.value) || 2500;
@@ -501,7 +500,6 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                // 🌟 禁用重新渲染时的旋转过度动画，防止 5 秒定时同步时饼图闪烁 🌟
                 animation: false,
                 plugins: {
                     legend: {
@@ -724,7 +722,7 @@
         }
     }
 
-    // 📷 拍照小票识别
+    // 📷 拍照小票识别 (🌟 升级版：加入单价与总金额防混淆逻辑 🌟)
     async function processReceiptImage(event) {
         const client = getSupabaseClient();
         if (!client) return alert('云数据库未连接成功，请刷新网页重试！');
@@ -748,7 +746,15 @@
         reader.onload = async function(e) {
             const base64Image = e.target.result;
             
-            const systemPrompt = `分析小票图片，提取每个商品明细。分类必须严格按照以下标准选择（不能混淆）：
+            // 🌟 强效精细化 Prompt：精准区分【单价】与【小计/总金额】🌟
+            const systemPrompt = `你是一位专业的小票识别助手。请分析小票图片，提取每个商品的消费明细。
+
+⚠️ 价格提取核心规则（非常重要）：
+1. **严格区分【单价】与【小计/金额】**：小票单行通常包含【商品名称】、【单价】、【数量】、【金额/小计】。必须强制提取最右侧的**【折后实付金额/小计/小额】**作为 amount，**绝对严禁把【单价】当作金额**！
+2. **逻辑公式自查**：提取时请自查逻辑：小计金额 = 单价 × 数量。如果一行有多个数字，务必取最终折后实付总额（即最右列或数值较大的那个实付额）。
+3. **过滤全局总结行**：如“小计”、“合计”、“应收”、“找零”等全单结算行不要当成单个商品。
+
+分类规则（严格遵循，不能混淆）：
 - 🥦生鲜食材：纯食材/生鲜食材。特别规则：凡是纯食材名称（如猪肉、牛肉、鸡肉、羊肉、蔬菜、娃娃菜、鸡蛋、鱼、虾等），即便没带“生”字，也必须强行归为【🥦生鲜食材】！严禁归为正餐外卖！
 - 🍱正餐外卖：做好的现成菜品/主食/快餐/外卖（如猪脚饭、牛肉煲仔饭、黄焖鸡米饭、炒面、快餐、外卖等）。
 - 🍰零食甜品：蛋糕、面包、烘焙糕点、甜点、坚果薯片、零食熟食。
