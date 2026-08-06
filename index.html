@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>👩‍❤️‍👨 双人 AI 记账管家 (小票精准识别版)</title>
+    <title>👩‍❤️‍👨 双人 AI 记账管家 (无感平滑体验版)</title>
     <!-- Chart.js 图表库 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
@@ -304,6 +304,7 @@
 
     let currentPersona = 'cat';
     let expenses = [];
+    let lastDataFingerprint = ''; // 🌟 用于记录数据指纹，防止重复刷界面跳动
     let monthlyBudget = 2500;
     
     // 图表句柄
@@ -321,7 +322,6 @@
         'deepseek-official': { host: 'https://api.deepseek.com/v1', model: 'deepseek-chat' }
     };
 
-    // 当 Supabase SDK 成功从 CDN 加载完毕时自动触发
     window.onSupabaseInit = function() {
         const client = getSupabaseClient();
         if (client) {
@@ -338,9 +338,7 @@
         document.getElementById('platformPreset').value = localStorage.getItem('platform_preset') || 'zhipu-free';
         document.getElementById('apiKey').value = localStorage.getItem('api_key') || '';
         applyPreset();
-        initSpeechRecognition();
 
-        // 尝试立即初始化
         if (window.isSupabaseReady) {
             window.onSupabaseInit();
         }
@@ -398,6 +396,18 @@
                 .order('timestamp', { ascending: true });
 
             if (!error && data) {
+                // 🌟 1. 生成数据指纹，判断数据是否真正发生变化
+                const newFingerprint = JSON.stringify(data.map(d => d.id + d.amount + d.description));
+                if (isSilent && newFingerprint === lastDataFingerprint) {
+                    // 数据没变，直接拦截退出！不重新渲染 DOM，保留用户当前下滑的位置
+                    return;
+                }
+                lastDataFingerprint = newFingerprint;
+
+                // 🌟 2. 记住当前活动 TAB 的滚动距离，重新渲染完后帮用户复原位置
+                const activeTab = document.querySelector('.tab-content.active');
+                const savedScrollTop = activeTab ? activeTab.scrollTop : 0;
+
                 expenses = data.map(item => ({
                     id: item.id,
                     amount: item.amount,
@@ -415,8 +425,9 @@
                 renderHistoryBanners();
                 if(selectedDetailDate) renderDayDetail(selectedDetailDate);
                 updateDashboardTotal();
-            } else if (error && !isSilent) {
-                console.error("数据库查询报错：", error);
+
+                // 🌟 3. 恢复滚动高度
+                if (activeTab) activeTab.scrollTop = savedScrollTop;
             }
         } catch(err) {
             console.warn("网络拉取异常：", err);
@@ -722,7 +733,7 @@
         }
     }
 
-    // 📷 拍照小票识别 (🌟 升级版：加入单价与总金额防混淆逻辑 🌟)
+    // 📷 拍照小票识别
     async function processReceiptImage(event) {
         const client = getSupabaseClient();
         if (!client) return alert('云数据库未连接成功，请刷新网页重试！');
@@ -746,7 +757,6 @@
         reader.onload = async function(e) {
             const base64Image = e.target.result;
             
-            // 🌟 强效精细化 Prompt：精准区分【单价】与【小计/总金额】🌟
             const systemPrompt = `你是一位专业的小票识别助手。请分析小票图片，提取每个商品的消费明细。
 
 ⚠️ 价格提取核心规则（非常重要）：
@@ -754,7 +764,7 @@
 2. **逻辑公式自查**：提取时请自查逻辑：小计金额 = 单价 × 数量。如果一行有多个数字，务必取最终折后实付总额（即最右列或数值较大的那个实付额）。
 3. **过滤全局总结行**：如“小计”、“合计”、“应收”、“找零”等全单结算行不要当成单个商品。
 
-分类规则（严格遵循，不能混淆）：
+分类规则：
 - 🥦生鲜食材：纯食材/生鲜食材。特别规则：凡是纯食材名称（如猪肉、牛肉、鸡肉、羊肉、蔬菜、娃娃菜、鸡蛋、鱼、虾等），即便没带“生”字，也必须强行归为【🥦生鲜食材】！严禁归为正餐外卖！
 - 🍱正餐外卖：做好的现成菜品/主食/快餐/外卖（如猪脚饭、牛肉煲仔饭、黄焖鸡米饭、炒面、快餐、外卖等）。
 - 🍰零食甜品：蛋糕、面包、烘焙糕点、甜点、坚果薯片、零食熟食。
@@ -817,31 +827,61 @@
         reader.readAsDataURL(file);
     }
 
-    function initSpeechRecognition() {
-        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+    // 🎙️ 🌟 iOS 适配增强版语音识别逻辑 🌟
+    function toggleVoiceInput() {
+        if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+            return alert('当前浏览器不支持语音识别！如果你使用的是 iPhone，请确保开启了【设置 -> 通用 -> 键盘 -> 启用听写】开关。');
+        }
+        
+        const micBtn = document.getElementById('micBtn');
+
+        if (isRecording) {
+            stopVoiceInput();
+            return;
+        }
+
+        try {
             const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
             recognition = new SpeechRec();
             recognition.lang = 'zh-CN';
+            recognition.continuous = false;
+            recognition.interimResults = false;
+
+            recognition.onstart = function() {
+                isRecording = true;
+                micBtn.classList.add('recording');
+            };
+
             recognition.onresult = function(event) {
-                document.getElementById('userInput').value = event.results[0][0].transcript;
+                if (event.results && event.results[0] && event.results[0][0]) {
+                    document.getElementById('userInput').value = event.results[0][0].transcript;
+                }
                 stopVoiceInput();
             };
-            recognition.onerror = stopVoiceInput;
+
+            recognition.onerror = function(event) {
+                console.warn("语音识别错误：", event.error);
+                stopVoiceInput();
+                if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                    alert('麦克风无法启动！请检查 iPhone：\n1. 设置 -> 通用 -> 键盘 -> 开启【启用听写】\n2. 确保 Safari 网页已允许麦克风权限。');
+                } else if (event.error === 'no-speech') {
+                    alert('没有检测到声音，请大声重试一下哦~');
+                }
+            };
+
             recognition.onend = stopVoiceInput;
-        } else {
-            document.getElementById('micBtn').style.display = 'none';
+
+            recognition.start();
+        } catch(e) {
+            alert('启动语音失败：' + e.message + '\n请检查 iPhone 设置中【启用听写】是否开启！');
+            stopVoiceInput();
         }
     }
 
-    function toggleVoiceInput() {
-        if(!recognition) return alert('当前浏览器不支持语音识别');
-        const micBtn = document.getElementById('micBtn');
-        if(!isRecording) { recognition.start(); isRecording = true; micBtn.classList.add('recording'); } 
-        else { stopVoiceInput(); }
-    }
-
     function stopVoiceInput() {
-        if(recognition && isRecording) { recognition.stop(); }
+        if(recognition && isRecording) {
+            try { recognition.stop(); } catch(e){}
+        }
         isRecording = false;
         document.getElementById('micBtn').classList.remove('recording');
     }
