@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>👩‍❤️‍👨 双人 AI 记账管家 (无感平滑体验版)</title>
+    <title>👩‍❤️‍👨  AI 记账管家</title>
     <!-- Chart.js 图表库 -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
@@ -234,9 +234,9 @@
     <!-- 底部固定输入栏 -->
     <div class="input-area">
         <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none;" onchange="processReceiptImage(event)">
-        <button class="btn-icon" onclick="document.getElementById('cameraInput').click()" title="拍照/上传小票">📷</button>
+        <button class="btn-icon" onclick="document.getElementById('cameraInput').click()" title="拍照/上传小票或订单截图">📷</button>
         <button class="btn-icon" id="micBtn" onclick="toggleVoiceInput()" title="按住语音输入">🎙️</button>
-        <input type="text" id="userInput" placeholder="输入或📷拍照小票，例: 猪肉 25" onkeypress="if(event.key==='Enter') addExpense()">
+        <input type="text" id="userInput" placeholder="输入或📷拍照/外卖截图，例: 猪肉 25" onkeypress="if(event.key==='Enter') addExpense()">
         <button class="send" id="sendBtn" onclick="addExpense()">记账</button>
     </div>
 </div>
@@ -304,7 +304,7 @@
 
     let currentPersona = 'cat';
     let expenses = [];
-    let lastDataFingerprint = ''; // 🌟 用于记录数据指纹，防止重复刷界面跳动
+    let lastDataFingerprint = '';
     let monthlyBudget = 2500;
     
     // 图表句柄
@@ -396,15 +396,12 @@
                 .order('timestamp', { ascending: true });
 
             if (!error && data) {
-                // 🌟 1. 生成数据指纹，判断数据是否真正发生变化
                 const newFingerprint = JSON.stringify(data.map(d => d.id + d.amount + d.description));
                 if (isSilent && newFingerprint === lastDataFingerprint) {
-                    // 数据没变，直接拦截退出！不重新渲染 DOM，保留用户当前下滑的位置
                     return;
                 }
                 lastDataFingerprint = newFingerprint;
 
-                // 🌟 2. 记住当前活动 TAB 的滚动距离，重新渲染完后帮用户复原位置
                 const activeTab = document.querySelector('.tab-content.active');
                 const savedScrollTop = activeTab ? activeTab.scrollTop : 0;
 
@@ -426,7 +423,6 @@
                 if(selectedDetailDate) renderDayDetail(selectedDetailDate);
                 updateDashboardTotal();
 
-                // 🌟 3. 恢复滚动高度
                 if (activeTab) activeTab.scrollTop = savedScrollTop;
             }
         } catch(err) {
@@ -733,7 +729,7 @@
         }
     }
 
-    // 📷 拍照小票识别
+    // 📷 拍照/外卖订单截图识别 (🌟 超级全能版 🌟)
     async function processReceiptImage(event) {
         const client = getSupabaseClient();
         if (!client) return alert('云数据库未连接成功，请刷新网页重试！');
@@ -751,36 +747,36 @@
         else if (modelName === 'Qwen/Qwen2.5-7B-Instruct') modelName = 'Qwen/Qwen2-VL-7B-Instruct';
 
         const sendBtn = document.getElementById('sendBtn');
-        sendBtn.disabled = true; sendBtn.innerText = '📷 识别小票中...';
+        sendBtn.disabled = true; sendBtn.innerText = '📷 识别分析中...';
 
         const reader = new FileReader();
         reader.onload = async function(e) {
             const base64Image = e.target.result;
             
-            const systemPrompt = `你是一位专业的小票识别助手。请分析小票图片，提取每个商品的消费明细。
+            const systemPrompt = `你是一位全能的账单识别助手。请分析图片（无论是【实体超市小票】还是【美团、饿了么、盒马、淘宝等手机订单/外卖截图】），提取消费明细。
 
-⚠️ 价格提取核心规则（非常重要）：
-1. **严格区分【单价】与【小计/金额】**：小票单行通常包含【商品名称】、【单价】、【数量】、【金额/小计】。必须强制提取最右侧的**【折后实付金额/小计/小额】**作为 amount，**绝对严禁把【单价】当作金额**！
-2. **逻辑公式自查**：提取时请自查逻辑：小计金额 = 单价 × 数量。如果一行有多个数字，务必取最终折后实付总额（即最右列或数值较大的那个实付额）。
-3. **过滤全局总结行**：如“小计”、“合计”、“应收”、“找零”等全单结算行不要当成单个商品。
-
-分类规则：
-- 🥦生鲜食材：纯食材/生鲜食材。特别规则：凡是纯食材名称（如猪肉、牛肉、鸡肉、羊肉、蔬菜、娃娃菜、鸡蛋、鱼、虾等），即便没带“生”字，也必须强行归为【🥦生鲜食材】！严禁归为正餐外卖！
-- 🍱正餐外卖：做好的现成菜品/主食/快餐/外卖（如猪脚饭、牛肉煲仔饭、黄焖鸡米饭、炒面、快餐、外卖等）。
-- 🍰零食甜品：蛋糕、面包、烘焙糕点、甜点、坚果薯片、零食熟食。
-- ☕咖啡奶茶：咖啡、奶茶、果茶、饮品饮料。
-- 🍲约会大餐：火锅、烧烤、情侣约会大餐、精致餐厅聚餐。
-- 🌾粮油调味：米面、食用油、调味料、干货、冲调麦片。
-- 🧻日用百货：纸巾、抽纸、洗洁精、洗衣液、清洁洗护用品。
-- 🏠厨具家电：菜刀、锅具、碗筷餐具、厨房小家电。
-- 👗服饰美妆：衣服、鞋包、护肤彩妆。
-- 🚗交通出行：打车、滴滴、公交地铁、加油停车。
-- 🎬电影娱乐：电影票、游戏氪金、演出、会员充值。
-- 🐱宠物开销：猫粮、狗粮、宠物用品。
-- 其他：杂项开销
+⚠️ 价格与商品提取核心规则（极重要）：
+1. **必须提取折后最终实付款（小计）**：
+   - 比如外卖截图里商品原价22元，有新客立减或红包后“小计 ￥21”或“实付款 ￥21”，必须提取**实际扣款金额（21元）**！绝对不能提取原价（22元）！
+2. **提取商品名称**：
+   - 包含店铺或品类名更好，如“茶百道-超级大瓜”或“超级大瓜”。
+3. **精准分类**：
+   - ☕咖啡奶茶：茶百道、霸王茶姬、喜茶、奈雪、瑞幸、星巴克、咖啡、奶茶、饮品。
+   - 🥦生鲜食材：纯食材（猪肉、牛肉、鸡蛋、蔬菜、水果等）。
+   - 🍱正餐外卖：做好的现成菜品/快餐/主食/外卖。
+   - 🍰零食甜品：蛋糕、面包、甜点、零食。
+   - 🍲约会大餐：火锅、烧烤、情侣大餐。
+   - 🌾粮油调味：米面粮油、调料。
+   - 🧻日用百货：纸巾、洗洁精、清洁用品。
+   - 🏠厨具家电：餐具、锅具、厨房小家电。
+   - 👗服饰美妆：衣服、鞋包、彩妆护肤。
+   - 🚗交通出行：打车、滴滴、公交、加油。
+   - 🎬电影娱乐：电影票、游戏氪金、会员。
+   - 🐱宠物开销：猫粮、狗粮、宠物用品。
+   - 其他：杂项
 
 必须严格只返回 JSON 数组格式，不要 Markdown：
-[{"amount":12.5, "category":"🥦生鲜食材", "description":"猪肉", "aiComment":"短评", "badge":"勋章"}]`;
+[{"amount":21.0, "category":"☕咖啡奶茶", "description":"茶百道-超级大瓜", "aiComment":"夏天来一杯冰爽瓜瓜最爽了！", "badge":"奶茶达人"}]`;
 
             try {
                 const response = await fetch(`${apiHost}/chat/completions`, {
@@ -804,10 +800,10 @@
                     if (!item.amount || item.amount <= 0) continue;
                     await client.from('expenses').insert([{
                         amount: Number(item.amount) || 0,
-                        category: item.category || '🥦生鲜食材',
-                        description: item.description || '小票商品',
-                        ai_comment: item.aiComment || '小票识别记录',
-                        badge: item.badge || '小票达人',
+                        category: item.category || '其他',
+                        description: item.description || '账单商品',
+                        ai_comment: item.aiComment || '自动识别记录',
+                        badge: item.badge || '消费达人',
                         persona_name: personaNames[currentPersona],
                         date: now.toISOString().split('T')[0],
                         time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -815,7 +811,7 @@
                     }]);
                     count++;
                 }
-                alert(`🎉 成功识别小票！已精准拆分记录了 ${count} 笔消费！`);
+                alert(`🎉 识别成功！已为你精准记录了 ${count} 笔消费！`);
                 fetchExpenses(true);
             } catch (err) {
                 alert('识别失败：' + err.message);
@@ -827,7 +823,7 @@
         reader.readAsDataURL(file);
     }
 
-    // 🎙️ 🌟 iOS 适配增强版语音识别逻辑 🌟
+    // 🎙️ iOS 兼容版语音识别
     function toggleVoiceInput() {
         if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
             return alert('当前浏览器不支持语音识别！如果你使用的是 iPhone，请确保开启了【设置 -> 通用 -> 键盘 -> 启用听写】开关。');
@@ -865,7 +861,7 @@
                 if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
                     alert('麦克风无法启动！请检查 iPhone：\n1. 设置 -> 通用 -> 键盘 -> 开启【启用听写】\n2. 确保 Safari 网页已允许麦克风权限。');
                 } else if (event.error === 'no-speech') {
-                    alert('没有检测到声音，请大声重试一下哦~');
+                    alert('没有检测到声音，大声说一句试试~');
                 }
             };
 
